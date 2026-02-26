@@ -26,6 +26,7 @@ WordWave es una aplicación móvil para iOS y Android donde grupos de amigos pue
 ## 🛠️ Stack Tecnológico
 
 ### Frontend
+
 - **React Native** con Expo
 - **TypeScript**
 - **React Navigation** para navegación
@@ -33,6 +34,7 @@ WordWave es una aplicación móvil para iOS y Android donde grupos de amigos pue
 - **React Native Reanimated** para animaciones
 
 ### Backend
+
 - **Django 4.x**
 - **Django REST Framework** para API REST
 - **Django Channels** para WebSockets
@@ -58,6 +60,7 @@ papelitos/
 ## 🚀 Instalación
 
 ### Backend
+
 ```bash
 cd backend
 python -m venv venv
@@ -68,6 +71,7 @@ python manage.py runserver
 ```
 
 ### Mobile
+
 ```bash
 cd mobile
 npm install
