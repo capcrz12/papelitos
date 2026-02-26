@@ -6,8 +6,10 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-} from "react-native";
-import { useRouter } from "expo-router";
+  Alert,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { useGestureDetector } from '../src/hooks/useGestureDetector';
 
 const { height } = Dimensions.get("window");
 
@@ -32,8 +34,16 @@ export default function GameScreen() {
   const [score, setScore] = useState({ team1: 0, team2: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [wordsGuessed, setWordsGuessed] = useState(0);
+  const [gesturesEnabled, setGesturesEnabled] = useState(false);
 
   const cardAnimation = new Animated.Value(0);
+
+  // Enable gesture detection when playing
+  useGestureDetector({
+    onSwipeUp: wordGuessed,
+    enabled: gesturesEnabled && isPlaying,
+    threshold: 1.2,
+  });
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -43,12 +53,19 @@ export default function GameScreen() {
       }, 1000);
     } else if (timeLeft === 0) {
       endTurn();
+    setGesturesEnabled(true);
+    Alert.alert(
+      '¡Listos!',
+      'Mueve el móvil hacia arriba cuando acierten una palabra',
+      [{ text: 'OK' }]
+    );
     }
     return () => clearInterval(timer);
   }, [isPlaying, timeLeft]);
 
   const startTurn = () => {
     setIsPlaying(true);
+    setGesturesEnabled(false);
     setTimeLeft(60);
     setWordsGuessed(0);
   };
@@ -158,7 +175,8 @@ export default function GameScreen() {
 
             <TouchableOpacity
               style={[styles.actionButton, styles.correctButton]}
-              onPress={wordGuessed}
+            🔼 Mueve el móvil hacia arriba cuando acierten {'\n'}
+           
             >
               <Text style={styles.actionButtonText}>✅ ¡Correcto!</Text>
             </TouchableOpacity>
