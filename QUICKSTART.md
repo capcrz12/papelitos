@@ -60,6 +60,24 @@ Aquí puedes:
 
 ## 🐛 Solución de Problemas
 
+### ⚠️ Error al escanear QR - Versiones Incompatibles
+
+Si al escanear el QR obtienes un error y ves este warning:
+```
+The following packages should be updated for best compatibility...
+expo-sensors@13.0.9 - expected version: ~12.9.1
+react-native@0.73.4 - expected version: 0.73.6
+```
+
+**Solución:**
+```powershell
+cd mobile
+npx expo install --fix
+npx expo start --clear
+```
+
+Esto corrige automáticamente las versiones y reinicia con caché limpio.
+
 ### El backend no inicia
 
 ```powershell
@@ -68,7 +86,7 @@ cd backend
 python manage.py migrate
 ```
 
-### La app móvil muestra errores
+### La app móvil muestra errores generales
 
 ```powershell
 cd mobile
@@ -76,11 +94,12 @@ npm install
 npx expo start -c  # -c limpia el caché
 ```
 
-### Error de versiones de paquetes
+### Puerto 8081 ocupado
 
+Si ves "Port 8081 is being used", escribe `y` para usar otro puerto o:
 ```powershell
-cd mobile
-npx expo install --fix
+# Matar proceso en puerto 8081
+Get-NetTCPConnection -LocalPort 8081 | Select-Object -ExpandProperty OwningProcess -First 1 | ForEach-Object { Stop-Process -Id $_ -Force }
 ```
 
 ## 📝 Credenciales
