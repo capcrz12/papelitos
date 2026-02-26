@@ -7,11 +7,13 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
 ### 📱 Aplicación Móvil (React Native + Expo)
 
 **Pantallas implementadas:**
+
 1. **Home Screen** - Crear o unirse a partidas
 2. **Lobby Screen** - Sala de espera con visualización de jugadores y equipos
 3. **Game Screen** - Pantalla de juego con temporizador y palabras
 
 **Características técnicas:**
+
 - ✅ **Detección de gestos con acelerómetro** - Mueve el móvil hacia arriba para marcar palabra correcta
 - ✅ **Conexión WebSocket en tiempo real** - Hook personalizado `useSocket` para comunicación instantánea
 - ✅ **Componentes UI reutilizables**:
@@ -42,6 +44,7 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
    - Sistema para obtener palabras aleatorias
 
 **Características técnicas:**
+
 - ✅ Django REST Framework para API
 - ✅ Django Channels + Redis para WebSockets
 - ✅ Serializers para todas las entidades
@@ -52,6 +55,7 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
 ### 🐳 DevOps e Infraestructura
 
 **Configuración completa:**
+
 - ✅ **Dockerfile** - Containerización del backend
 - ✅ **docker-compose.yml** - Orquestación con PostgreSQL + Redis + Django
 - ✅ **GitHub Actions CI/CD**:
@@ -65,6 +69,7 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
 ### 📚 Documentación
 
 **Archivos de documentación:**
+
 1. **README.md** - Guía principal del proyecto
 2. **CONTRIBUTING.md** - Guía de contribución con convenciones
 3. **DEPLOYMENT.md** - Guía completa de deployment (Railway, AWS, DigitalOcean, App Stores)
@@ -104,7 +109,6 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
      - Ronda 2: Una sola palabra
      - Ronda 3: Solo mímica
      - Ronda 4: Solo sonidos
-   
 4. **Interacción**
    - Jugador activo ve palabras en su móvil
    - **Gesto hacia arriba** o botón para marcar correcta
@@ -155,11 +159,13 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
 ### Para poner en marcha el proyecto:
 
 1. **Crear repositorio en GitHub** (ver GITHUB_SETUP.md)
+
    ```bash
    gh repo create wordwave --public --source=. --remote=origin --push
    ```
 
 2. **Hacer push del código**
+
    ```bash
    git push -u origin master
    ```
@@ -169,11 +175,12 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
    - Crear labels: `feature`, `bug`, `enhancement`, `docs`
 
 4. **Configurar proyecto localmente**
+
    ```bash
    # Backend
    cd backend
    ./setup.sh  # o setup.ps1 en Windows
-   
+
    # Mobile
    cd mobile
    npm install
@@ -193,17 +200,20 @@ He desarrollado una **aplicación móvil completa** para el juego "Papelitos" (a
 ## 🎨 Capturas de Pantalla (Mockup)
 
 ### Home Screen
+
 - Input de nombre
 - Botón "Crear Partida"
 - Input de código + "Unirse a Partida"
 
 ### Lobby Screen
+
 - Código de sala grande y visible
 - Lista de jugadores divididos por equipos
 - Configuración visible
 - Botón "Comenzar Juego" (solo para host)
 
 ### Game Screen
+
 - Temporizador prominente
 - Tarjeta de palabra grande
 - Indicador de ronda actual
