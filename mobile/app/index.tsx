@@ -1,23 +1,29 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import { useRouter } from "expo-router";
 
 export default function HomeScreen() {
-  const [roomCode, setRoomCode] = useState('');
-  const [playerName, setPlayerName] = useState('');
+  const [roomCode, setRoomCode] = useState("");
+  const [playerName, setPlayerName] = useState("");
   const router = useRouter();
 
   const createRoom = () => {
     if (playerName.trim()) {
       // TODO: Call API to create room
-      router.push('/lobby');
+      router.push("/lobby");
     }
   };
 
   const joinRoom = () => {
     if (playerName.trim() && roomCode.trim()) {
       // TODO: Call API to join room
-      router.push('/lobby');
+      router.push("/lobby");
     }
   };
 
@@ -73,85 +79,85 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 20,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 60,
   },
   title: {
     fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontWeight: "bold",
+    color: "#2c3e50",
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#7f8c8d',
+    color: "#7f8c8d",
   },
   form: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     marginTop: -100,
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
   },
   primaryButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: "#3498db",
     borderRadius: 12,
     padding: 18,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   primaryButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   secondaryButton: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 12,
     padding: 18,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#3498db',
+    borderColor: "#3498db",
   },
   secondaryButtonText: {
-    color: '#3498db',
+    color: "#3498db",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: 20,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: "#e0e0e0",
   },
   dividerText: {
     marginHorizontal: 16,
-    color: '#999',
+    color: "#999",
     fontSize: 16,
   },
   footer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 20,
   },
   footerText: {
-    color: '#7f8c8d',
+    color: "#7f8c8d",
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

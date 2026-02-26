@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,23 +6,28 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+} from "react-native";
+import { useRouter } from "expo-router";
 
-const { height } = Dimensions.get('window');
+const { height } = Dimensions.get("window");
 
 const ROUNDS = [
-  { id: 1, name: 'Descripción', icon: '💬', description: 'Describe sin decir la palabra' },
-  { id: 2, name: 'Una Palabra', icon: '🎯', description: 'Solo una palabra' },
-  { id: 3, name: 'Mímica', icon: '🤸', description: 'Solo gestos' },
-  { id: 4, name: 'Sonidos', icon: '🔊', description: 'Solo sonidos' },
+  {
+    id: 1,
+    name: "Descripción",
+    icon: "💬",
+    description: "Describe sin decir la palabra",
+  },
+  { id: 2, name: "Una Palabra", icon: "🎯", description: "Solo una palabra" },
+  { id: 3, name: "Mímica", icon: "🤸", description: "Solo gestos" },
+  { id: 4, name: "Sonidos", icon: "🔊", description: "Solo sonidos" },
 ];
 
 export default function GameScreen() {
   const router = useRouter();
   const [currentRound, setCurrentRound] = useState(1);
   const [isMyTurn, setIsMyTurn] = useState(true);
-  const [currentWord, setCurrentWord] = useState('Elefante');
+  const [currentWord, setCurrentWord] = useState("Elefante");
   const [timeLeft, setTimeLeft] = useState(60);
   const [score, setScore] = useState({ team1: 0, team2: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
@@ -63,7 +68,7 @@ export default function GameScreen() {
     }).start(() => {
       setWordsGuessed(wordsGuessed + 1);
       setScore({ ...score, team1: score.team1 + 1 });
-      setCurrentWord('Siguiente palabra'); // TODO: Get next word
+      setCurrentWord("Siguiente palabra"); // TODO: Get next word
       cardAnimation.setValue(0);
     });
   };
@@ -75,7 +80,7 @@ export default function GameScreen() {
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
-      setCurrentWord('Siguiente palabra'); // TODO: Get next word
+      setCurrentWord("Siguiente palabra"); // TODO: Get next word
       cardAnimation.setValue(0);
     });
   };
@@ -107,7 +112,8 @@ export default function GameScreen() {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <Text style={styles.roundText}>
-          {ROUNDS[currentRound - 1].icon} Ronda {currentRound}: {ROUNDS[currentRound - 1].name}
+          {ROUNDS[currentRound - 1].icon} Ronda {currentRound}:{" "}
+          {ROUNDS[currentRound - 1].name}
         </Text>
         <Text style={styles.timerText}>{timeLeft}s</Text>
       </View>
@@ -170,45 +176,45 @@ export default function GameScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#3498db',
+    backgroundColor: "#3498db",
     padding: 20,
   },
   topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 40,
     paddingBottom: 20,
   },
   roundText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   timerText: {
-    color: 'white',
+    color: "white",
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   scoreRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginBottom: 20,
   },
   miniScore: {
-    color: 'white',
+    color: "white",
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   wordCard: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 20,
     padding: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginVertical: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -216,102 +222,102 @@ const styles = StyleSheet.create({
   },
   wordText: {
     fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#2c3e50",
+    textAlign: "center",
   },
   wordsGuessedText: {
     fontSize: 16,
-    color: '#7f8c8d',
+    color: "#7f8c8d",
     marginTop: 20,
   },
   actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 15,
   },
   actionButton: {
     flex: 1,
     padding: 20,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   skipButton: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: "#e74c3c",
   },
   correctButton: {
-    backgroundColor: '#27ae60',
+    backgroundColor: "#27ae60",
   },
   actionButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   instructionText: {
-    color: 'white',
-    textAlign: 'center',
+    color: "white",
+    textAlign: "center",
     marginTop: 15,
     fontSize: 14,
     opacity: 0.8,
   },
   startContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   roundDescription: {
-    color: 'white',
+    color: "white",
     fontSize: 24,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 40,
   },
   startButton: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     paddingHorizontal: 40,
     paddingVertical: 20,
     borderRadius: 12,
   },
   startButtonText: {
-    color: '#3498db',
+    color: "#3498db",
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   waitingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   waitingTitle: {
-    color: 'white',
+    color: "white",
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
   },
   waitingSubtitle: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    textAlign: 'center',
+    textAlign: "center",
     opacity: 0.9,
     marginBottom: 40,
   },
   scoreBoard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 30,
   },
   scoreItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     padding: 20,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   scoreLabel: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
     marginBottom: 10,
   },
   scoreValue: {
-    color: 'white',
+    color: "white",
     fontSize: 36,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
