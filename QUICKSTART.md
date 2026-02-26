@@ -25,17 +25,29 @@ Admin panel: http://localhost:8000/admin
 
 ### Mobile (Expo) - Terminal 2
 
+**MÉTODO 1: Usando el script (RECOMENDADO)**
+
 ```powershell
 cd mobile
-npx expo start
+# Doble clic en EJECUTAR_EXPO.bat
+# O ejecuta:
+.\iniciar-expo.ps1
+```
+
+**MÉTODO 2: Manual**
+
+```powershell
+cd mobile
+$env:REACT_NATIVE_PACKAGER_HOSTNAME='192.168.1.194'  # Cambia por tu IP
+npx expo start --lan
 ```
 
 Luego:
 
-- Presiona `w` para abrir en navegador web
-- Escanea el QR con la app Expo Go en tu teléfono
-- Presiona `a` para abrir en emulador Android
-- Presiona `i` para abrir en simulador iOS
+- Abre **Expo Go** en tu teléfono (misma red WiFi)
+- Toca **"Enter URL manually"**
+- Ingresa: `exp://192.168.1.194:8081` (usa tu IP)
+- O escanea el QR que aparece en la terminal
 
 ## 📱 Probar la Aplicación
 
@@ -63,6 +75,7 @@ Aquí puedes:
 ### ⚠️ Error al escanear QR - Versiones Incompatibles
 
 Si al escanear el QR obtienes un error y ves este warning:
+
 ```
 The following packages should be updated for best compatibility...
 expo-sensors@13.0.9 - expected version: ~12.9.1
@@ -70,6 +83,7 @@ react-native@0.73.4 - expected version: 0.73.6
 ```
 
 **Solución:**
+
 ```powershell
 cd mobile
 npx expo install --fix
@@ -97,6 +111,7 @@ npx expo start -c  # -c limpia el caché
 ### Puerto 8081 ocupado
 
 Si ves "Port 8081 is being used", escribe `y` para usar otro puerto o:
+
 ```powershell
 # Matar proceso en puerto 8081
 Get-NetTCPConnection -LocalPort 8081 | Select-Object -ExpandProperty OwningProcess -First 1 | ForEach-Object { Stop-Process -Id $_ -Force }

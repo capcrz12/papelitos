@@ -1,6 +1,7 @@
 # 📱 Cómo Conectar tu Dispositivo Móvil
 
 ## ✅ Estado Actual
+
 - ✓ Metro Bundler está corriendo en puerto 8081
 - ✓ Tu IP local es: **192.168.1.194**
 
@@ -9,6 +10,7 @@
 ### Método 1: Usando la Interfaz Web (RECOMENDADO)
 
 1. **Abre en tu navegador de PC:**
+
    ```
    http://localhost:8081
    ```
@@ -20,6 +22,7 @@
 ### Método 2: Conexión Manual
 
 **En tu app Expo Go:**
+
 1. Abre Expo Go en tu teléfono
 2. Toca "Enter URL manually"
 3. Ingresa esta URL:
@@ -30,6 +33,7 @@
 ### Método 3: Ver el QR en la Terminal
 
 Si prefieres ver el QR en la terminal:
+
 1. Ve a la terminal donde está corriendo Expo
 2. Debería mostrar un código QR en ASCII art
 3. Si no se ve, presiona `r` para refrescar

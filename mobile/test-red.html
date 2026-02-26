@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test de Red - Papelitos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .success {
+            background: #4CAF50;
+            color: white;
+        }
+        .info {
+            background: #2196F3;
+            color: white;
+        }
+        .url {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 16px;
+            text-align: center;
+            margin: 15px 0;
+        }
+        .instructions {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+        }
+        .qr-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #qr-code {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border: 2px solid #ddd;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="card">
+        <h1>🎯 Test de Conexión - Papelitos</h1>
+        
+        <div class="status success">
+            ✅ ¡TU PC ESTÁ ACCESIBLE EN LA RED!
+        </div>
+        
+        <div class="status info">
+            Si puedes ver esta página desde tu teléfono, la red funciona correctamente
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📱 URL para Expo Go</h2>
+        <div class="url" id="expo-url">exp://192.168.1.194:8081</div>
+        
+        <div class="qr-container">
+            <div id="qr-code"></div>
+            <p>Escanea este QR con Expo Go</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📝 Instrucciones</h2>
+        <div class="instructions">
+            <h3>Si puedes ver esta página en tu teléfono:</h3>
+            <ol>
+                <li>Abre la app <strong>Expo Go</strong></li>
+                <li>Toca <strong>"Enter URL manually"</strong></li>
+                <li>Copia y pega: <code>exp://192.168.1.194:8081</code></li>
+                <li>O escanea el QR de arriba</li>
+            </ol>
+            
+            <h3>Si NO puedes ver esta página:</h3>
+            <ul>
+                <li>❌ Tu teléfono NO está en la misma red WiFi</li>
+                <li>❌ El firewall está bloqueando la conexión</li>
+                <li>❌ Tu router tiene aislamiento de clientes activado</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🔧 Información Técnica</h2>
+        <p><strong>IP de tu PC:</strong> 192.168.1.194</p>
+        <p><strong>Puerto Metro:</strong> 8081</p>
+        <p><strong>Puerto de prueba:</strong> 3000</p>
+        <p><strong>Estado Metro Bundler:</strong> <span id="metro-status">Verificando...</span></p>
+    </div>
+
+    <script>
+        // Generar QR Code
+        const qrUrl = document.getElementById('expo-url').textContent;
+        new QRCode(document.getElementById("qr-code"), {
+            text: qrUrl,
+            width: 256,
+            height: 256
+        });
+
+        // Verificar Metro Bundler
+        fetch('http://192.168.1.194:8081/status')
+            .then(response => {
+                document.getElementById('metro-status').innerHTML = '<span style="color: #4CAF50;">✅ Activo</span>';
+            })
+            .catch(error => {
+                document.getElementById('metro-status').innerHTML = '<span style="color: #f44336;">❌ No accesible</span>';
+            });
+
+        // Auto-refrescar info de red
+        setInterval(() => {
+            document.getElementById('network-time').textContent = new Date().toLocaleTimeString();
+        }, 1000);
+    </script>
+</body>
+</html>
