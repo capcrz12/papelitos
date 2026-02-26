@@ -1,0 +1,88 @@
+═══════════════════════════════════════════════════════
+  📱 CÓMO CONECTAR TU TELÉFONO A EXPO  
+═══════════════════════════════════════════════════════
+
+✅ ESTADO ACTUAL:
+   • Expo está corriendo en tu PC
+   • Puerto 8081: ABIERTO ✓
+   • Tu IP local: 192.168.1.194
+
+═══════════════════════════════════════════════════════
+  🎯 MÉTODO 1: CONEXIÓN MANUAL (RECOMENDADO)
+═══════════════════════════════════════════════════════
+
+1. Abre la app "Expo Go" en tu teléfono
+   (Si no la tienes, descárgala de Play Store o App Store)
+
+2. En Expo Go, toca "Enter URL manually"
+
+3. Escribe esta URL EXACTA:
+
+   ▶ exp://192.168.1.194:8081
+
+4. Toca "Connect" o presiona Enter
+
+═══════════════════════════════════════════════════════
+  🔥 SI NO FUNCIONA: CONFIGURAR FIREWALL
+═══════════════════════════════════════════════════════
+
+El firewall de Windows puede estar bloqueando la conexión.
+
+OPCIÓN A - Con el script:
+1. Haz clic derecho en "fix-firewall.ps1"
+2. Selecciona "Ejecutar con PowerShell como administrador"
+3. Presiona cualquier tecla cuando termine
+
+OPCIÓN B - Manual:
+1. Abre "Firewall de Windows Defender" 
+2. Clic en "Configuración avanzada"
+3. Clic en "Reglas de entrada" → "Nueva regla"
+4. Selecciona "Puerto" → TCP → 8081
+5. Permitir la conexión
+
+═══════════════════════════════════════════════════════
+  ⚠️  CHECKLIST IMPORTANTE
+═══════════════════════════════════════════════════════
+
+□ Tu teléfono y PC están en LA MISMA RED WIFI
+  (No uses datos móviles, usa WiFi)
+
+□ En tu teléfono, WiFi está activado y conectado
+  a la misma red que tu PC
+
+□ No tienes VPN activa en el teléfono o PC
+
+□ Tienes instalada la app "Expo Go" actualizada
+
+□ El firewall de Windows permitió Node.js
+
+═══════════════════════════════════════════════════════
+  🌐 URLs ÚTILES
+═══════════════════════════════════════════════════════
+
+• Interfaz web Metro: http://localhost:8081
+• URL para Expo Go: exp://192.168.1.194:8081
+• Backend Django: http://localhost:8000
+
+═══════════════════════════════════════════════════════
+  🆘 PROBLEMAS COMUNES
+═══════════════════════════════════════════════════════
+
+❌ "Cannot connect to Metro"
+   → Verifica que estés en la misma red WiFi
+   → Ejecuta fix-firewall.ps1 como administrador
+
+❌ El QR no se escanea
+   → Usa el método manual con la URL
+
+❌ "Network error"
+   → Desactiva VPN si tienes alguna
+   → Reinicia el router
+
+❌ "Bundling failed"
+   → En la terminal de Expo, presiona 'r' para reload
+   → O reinicia con: npx expo start --clear
+
+═══════════════════════════════════════════════════════
+
+¿Necesitas ayuda? Revisa CONEXION_MOVIL.md para más detalles.
