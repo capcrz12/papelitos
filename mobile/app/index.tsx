@@ -35,17 +35,18 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.form}>
-        <TextInput
-          style={styles.input}
+        <Input
           placeholder="Tu nombre"
           value={playerName}
           onChangeText={setPlayerName}
-          placeholderTextColor="#999"
         />
 
-        <TouchableOpacity style={styles.primaryButton} onPress={createRoom}>
-          <Text style={styles.primaryButtonText}>Crear Partida</Text>
-        </TouchableOpacity>
+        <Button
+          title="Crear Partida"
+          onPress={createRoom}
+          variant="primary"
+          size="large"
+        />
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
@@ -53,18 +54,19 @@ export default function HomeScreen() {
           <View style={styles.dividerLine} />
         </View>
 
-        <TextInput
-          style={styles.input}
+        <Input
           placeholder="Código de sala"
           value={roomCode}
           onChangeText={setRoomCode}
           autoCapitalize="characters"
-          placeholderTextColor="#999"
         />
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={joinRoom}>
-          <Text style={styles.secondaryButtonText}>Unirse a Partida</Text>
-        </TouchableOpacity>
+        <Button
+          title="Unirse a Partida"
+          onPress={joinRoom}
+          variant="secondary"
+          size="large"
+        />
       </View>
 
       <View style={styles.footer}>
