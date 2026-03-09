@@ -11,6 +11,12 @@ class GameConsumer(AsyncWebsocketConsumer):
         self.room_code = self.scope['url_route']['kwargs']['room_code']
         self.room_group_name = f'game_{self.room_code}'
         
+        # Verify room exists before connecting
+        room_exists = await self.check_room_exists()
+        if not room_exists:
+            await self.close(code=4004)  # Custom close code for room not found
+            return
+        
         # Join room group
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -25,6 +31,16 @@ class GameConsumer(AsyncWebsocketConsumer):
             'type': 'game_state',
             'data': game_state
         }))
+        
+        # Notify other players in the room
+        players = await self.get_players()
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'player_update',
+                'players': players
+            }
+        )
     
     async def disconnect(self, close_code):
         # Leave room group
@@ -40,6 +56,8 @@ class GameConsumer(AsyncWebsocketConsumer):
         
         if message_type == 'player_joined':
             await self.player_joined(data)
+        elif message_type == 'change_team':
+            await self.change_team(data)
         elif message_type == 'start_game':
             await self.start_game(data)
         elif message_type == 'word_guessed':
@@ -56,6 +74,25 @@ class GameConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             {
                 'type': 'player_update',
+                'players': await self.get_players()
+            }
+        )
+    
+    async def change_team(self, data):
+        """Handle player changing team."""
+        player_id = data.get('player_id')
+        new_team = data.get('team')
+        
+        # Update player's team in database
+        await self.update_player_team(player_id, new_team)
+        
+        # Broadcast to room group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'team_changed',
+                'player_id': player_id,
+                'team': new_team,
                 'players': await self.get_players()
             }
         )
@@ -137,7 +174,20 @@ class GameConsumer(AsyncWebsocketConsumer):
             'game_state': event['game_state']
         }))
     
+    async def team_changed(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'team_changed',
+            'player_id': event['player_id'],
+            'team': event['team'],
+            'players': event['players']
+        }))
+    
     # Database queries
+    @database_sync_to_async
+    def check_room_exists(self):
+        """Check if the room exists."""
+        return Room.objects.filter(code=self.room_code).exists()
+    
     @database_sync_to_async
     def get_game_state(self):
         try:
@@ -157,6 +207,17 @@ class GameConsumer(AsyncWebsocketConsumer):
     def get_players(self):
         room = Room.objects.get(code=self.room_code)
         return list(room.players.values('id', 'name', 'team', 'is_connected'))
+    
+    @database_sync_to_async
+    def update_player_team(self, player_id, new_team):
+        """Update a player's team."""
+        try:
+            player = Player.objects.get(id=player_id)
+            player.team = new_team
+            player.save()
+            return True
+        except Player.DoesNotExist:
+            return False
     
     @database_sync_to_async
     def initialize_game(self):

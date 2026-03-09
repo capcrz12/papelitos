@@ -12,6 +12,8 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
+import { useSocket } from "../src/hooks/useSocket";
+import { gameApi } from "../src/services/api";
 
 interface Player {
   id: string;
@@ -35,12 +37,31 @@ export default function LobbyScreen() {
   // Get parameters from navigation
   const playerName = (params.playerName as string) || "Jugador";
   const isHostParam = params.isHost === "true";
-  const roomCodeParam = (params.roomCode as string) || generateRoomCode();
+  const roomCodeParam = params.roomCode as string;
+  const playerId = (params.playerId as string) || "1";
+  const playerTeam = parseInt((params.playerTeam as string) || "1", 10);
+
+  // Log received parameters for debugging
+  console.log("Lobby params:", {
+    playerName,
+    isHostParam,
+    roomCodeParam,
+    playerId,
+    playerTeam,
+  });
+
+  // If no room code provided, something went wrong - go back
+  if (!roomCodeParam) {
+    console.error("No room code provided to lobby!");
+    Alert.alert("Error", "No se proporcionó código de sala");
+    router.back();
+    return null;
+  }
 
   const [roomCode, setRoomCode] = useState(roomCodeParam);
-  // Initialize with only the current player using the real name
+  // Initialize with only the current player using real data from backend
   const [players, setPlayers] = useState<Player[]>([
-    { id: "1", name: playerName, team: 1, isMe: true },
+    { id: playerId, name: playerName, team: playerTeam, isMe: true },
   ]);
   const [isHost, setIsHost] = useState(isHostParam);
   const [editingName, setEditingName] = useState(false);
@@ -53,11 +74,94 @@ export default function LobbyScreen() {
     rounds: 4,
   });
 
-  // TODO: Listen to WebSocket for new players joining
+  // WebSocket connection
+  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || "http://localhost:8000";
+  const { socket, isConnected, emit, on, off } = useSocket({
+    url: wsUrl,
+    roomCode: roomCode,
+    enabled: true,
+  });
+
+  // Listen to WebSocket for new players joining
   useEffect(() => {
-    // Placeholder for WebSocket connection
-    // When a player joins, add them to the players array
-  }, []);
+    if (!on || !off) return;
+
+    const normalizePlayers = (serverPlayers: any[]): Player[] =>
+      serverPlayers.map((p) => ({
+        id: String(p.id),
+        name: p.name,
+        team: p.team ?? null,
+        isMe: String(p.id) === playerId,
+      }));
+
+    // Listen for room not found error
+    const handleRoomNotFound = () => {
+      Alert.alert("Sala no encontrada", "La sala no existe o ha expirado", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    };
+
+    // Listen for player joined events
+    const handlePlayerJoined = (data: any) => {
+      console.log("Player joined:", data);
+      if (data?.players) {
+        setPlayers(normalizePlayers(data.players));
+        return;
+      }
+      const newPlayer: Player = {
+        id: data.player?.id?.toString(),
+        name: data.player?.name,
+        team: data.player?.team || null,
+        isMe: data.player?.id?.toString() === playerId,
+      };
+      if (!newPlayer.id || !newPlayer.name) return;
+      setPlayers((prev) =>
+        prev.some((p) => p.id === newPlayer.id) ? prev : [...prev, newPlayer],
+      );
+    };
+
+    // Main sync event from backend with full player list
+    const handlePlayerUpdate = (data: any) => {
+      if (!data?.players) return;
+      setPlayers(normalizePlayers(data.players));
+    };
+
+    // Listen for player left events
+    const handlePlayerLeft = (data: any) => {
+      console.log("Player left:", data);
+      setPlayers((prev) =>
+        prev.filter((p) => p.id !== data.player_id.toString()),
+      );
+    };
+
+    // Listen for team changes
+    const handleTeamChanged = (data: any) => {
+      console.log("Team changed:", data);
+      if (data?.players) {
+        setPlayers(normalizePlayers(data.players));
+        return;
+      }
+      setPlayers((prev) =>
+        prev.map((p) =>
+          p.id === data.player_id.toString() ? { ...p, team: data.team } : p,
+        ),
+      );
+    };
+
+    on("room_not_found", handleRoomNotFound);
+    on("player_update", handlePlayerUpdate);
+    on("player_joined", handlePlayerJoined);
+    on("player_left", handlePlayerLeft);
+    on("team_changed", handleTeamChanged);
+
+    return () => {
+      off("room_not_found", handleRoomNotFound);
+      off("player_update", handlePlayerUpdate);
+      off("player_joined", handlePlayerJoined);
+      off("player_left", handlePlayerLeft);
+      off("team_changed", handleTeamChanged);
+    };
+  }, [on, off, playerId, router]);
 
   const myPlayer = players.find((p) => p.isMe);
 
@@ -75,13 +179,29 @@ export default function LobbyScreen() {
       Alert.alert("Error", "Ambos equipos deben tener al menos 1 jugador");
       return;
     }
-    router.push("/game");
+
+    // Call backend to start game
+    gameApi
+      .startGame(roomCode)
+      .then(() => {
+        router.push("/game");
+      })
+      .catch((err) => {
+        console.error("Error starting game:", err);
+        Alert.alert("Error", "No se pudo iniciar la partida");
+      });
   };
 
   const changeTeam = (playerId: string, newTeam: number) => {
+    // Update locally first
     setPlayers(
       players.map((p) => (p.id === playerId ? { ...p, team: newTeam } : p)),
     );
+
+    // Emit to server if connected
+    if (isConnected && emit) {
+      emit("change_team", { player_id: playerId, team: newTeam });
+    }
   };
 
   const autoAssignTeams = () => {
@@ -154,6 +274,17 @@ export default function LobbyScreen() {
         </TouchableOpacity>
         <Text style={styles.roomCodeLabel}>Código de sala</Text>
         <Text style={styles.code}>{roomCode}</Text>
+        <View style={styles.connectionStatus}>
+          <View
+            style={[
+              styles.connectionDot,
+              isConnected ? styles.connectedDot : styles.disconnectedDot,
+            ]}
+          />
+          <Text style={styles.connectionText}>
+            {isConnected ? "Conectado" : "Conectando..."}
+          </Text>
+        </View>
         <Text style={styles.instruction}>
           Comparte este código con tus amigos
         </Text>
@@ -369,6 +500,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9ca3af",
     marginTop: 5,
+  },
+  connectionStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+    gap: 6,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  connectedDot: {
+    backgroundColor: "#22c55e",
+  },
+  disconnectedDot: {
+    backgroundColor: "#ef4444",
+  },
+  connectionText: {
+    fontSize: 12,
+    color: "#6b7280",
   },
   profileCard: {
     backgroundColor: "white",

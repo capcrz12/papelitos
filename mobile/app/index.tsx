@@ -5,15 +5,18 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
+import { API_BASE_URL, gameApi } from "../src/services/api";
 
 export default function HomeScreen() {
   const [roomCode, setRoomCode] = useState("");
   const [playerName, setPlayerName] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const createRoom = () => {
@@ -29,7 +32,7 @@ export default function HomeScreen() {
     });
   };
 
-  const joinRoom = () => {
+  const joinRoom = async () => {
     if (!playerName.trim()) {
       setError("Por favor ingresa tu nombre");
       return;
@@ -38,15 +41,45 @@ export default function HomeScreen() {
       setError("Por favor ingresa el código de sala");
       return;
     }
+
+    setLoading(true);
     setError("");
-    // TODO: Call API to join room, then navigate to lobby
-    router.push({
-      pathname: "/lobby",
-      params: {
-        playerName: playerName.trim(),
-        roomCode: roomCode.trim().toUpperCase(),
-      },
-    });
+
+    try {
+      // Call API to verify room exists and join
+      const response = await gameApi.joinRoom(
+        roomCode.trim().toUpperCase(),
+        playerName.trim(),
+      );
+
+      // Navigate to lobby with room data
+      router.push({
+        pathname: "/lobby",
+        params: {
+          playerName: playerName.trim(),
+          roomCode: response.room.code,
+          playerId: response.player.id.toString(),
+          playerTeam: response.player.team?.toString() || "1",
+          isHost: "false",
+          timePerTurn: response.room.seconds_per_turn.toString(),
+          wordsPerPlayer: response.room.words_per_player.toString(),
+        },
+      });
+    } catch (err: any) {
+      console.error("Error joining room:", err);
+      if (err.response?.status === 404) {
+        setError("No existe una sala con ese código");
+      } else if (err.response?.status === 400) {
+        setError(err.response.data.error || "Error al unirse a la sala");
+      } else {
+        console.error("Join failed against API:", API_BASE_URL);
+        setError(
+          `Error de conexión con ${API_BASE_URL}. Si te unes desde otro dispositivo, usa la IP local en EXPO_PUBLIC_API_URL.`,
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,6 +105,7 @@ export default function HomeScreen() {
           onPress={createRoom}
           variant="primary"
           size="large"
+          disabled={loading}
         />
 
         <View style={styles.divider}>
@@ -81,18 +115,30 @@ export default function HomeScreen() {
         </View>
 
         <Input
-          placeholder="Código de sala"
+          placeholder="Código de sala (ej: ABCD)"
           value={roomCode}
-          onChangeText={setRoomCode}
+          onChangeText={(text) => {
+            setRoomCode(text.toUpperCase());
+            setError("");
+          }}
           autoCapitalize="characters"
+          maxLength={4}
         />
 
         <Button
-          title="Unirse a Partida"
+          title={loading ? "Conectando..." : "Unirse a Partida"}
           onPress={joinRoom}
           variant="secondary"
           size="large"
+          disabled={loading}
         />
+
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3b82f6" />
+            <Text style={styles.loadingText}>Verificando sala...</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.footer}>
@@ -184,6 +230,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
     marginTop: -8,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#3b82f6",
+    fontWeight: "500",
   },
   footer: {
     alignItems: "center",

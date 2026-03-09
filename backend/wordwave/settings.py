@@ -14,7 +14,15 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-me-in-production')
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,*').split(',')
+
+# CSRF Trusted Origins - para desarrollo
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8081',
+    'http://localhost:19006',
+    'http://127.0.0.1:8081',
+    'http://127.0.0.1:19006',
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -112,19 +120,39 @@ REST_FRAMEWORK = {
     ],
 }
 
-# CORS
-CORS_ALLOWED_ORIGINS = os.getenv(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:19006'
-).split(',')
+# CORS - Configuración más permisiva para desarrollo
+CORS_ALLOW_ALL_ORIGINS = True  # Solo para desarrollo, en producción especificar orígenes
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Channels
+# Para desarrollo: usa InMemoryChannelLayer (no requiere Redis)
+# Para producción: descomentar RedisChannelLayer
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [os.getenv('REDIS_URL', 'redis://localhost:6379/0')],
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        # Para producción con Redis:
+        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # 'CONFIG': {
+        #     'hosts': [os.getenv('REDIS_URL', 'redis://localhost:6379/0')],
+        # },
     },
 }

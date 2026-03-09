@@ -6,10 +6,13 @@ import {
   ScrollView,
   Switch,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
+import { gameApi } from "../src/services/api";
 
 export default function ConfigScreen() {
   const router = useRouter();
@@ -25,6 +28,9 @@ export default function ConfigScreen() {
     rounds: [true, true, true, true], // 4 rounds: Description, One Word, Mime, Sounds
   });
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const timeOptions = [30, 45, 60, 90, 120];
   const wordsOptions = [2, 3, 4, 5, 6];
   const playerOptions = [4, 6, 8, 10, 12];
@@ -36,19 +42,61 @@ export default function ConfigScreen() {
   };
 
   const handleCreateRoom = async () => {
-    // TODO: Call API to create room with config
-    console.log("Creating room with config:", config);
-    router.push({
-      pathname: "/lobby",
-      params: {
-        playerName,
-        isHost: "true",
-        // Pass config as stringified JSON
-        timePerTurn: config.timePerTurn.toString(),
-        wordsPerPlayer: config.wordsPerPlayer.toString(),
-        maxPlayers: config.maxPlayers.toString(),
-      },
-    });
+    if (loading) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // Validate at least one round is enabled
+      if (!config.rounds.some((r) => r)) {
+        Alert.alert("Error", "Debes seleccionar al menos una ronda");
+        setLoading(false);
+        return;
+      }
+
+      // Create room with configuration
+      const response = await gameApi.createRoom(playerName, {
+        seconds_per_turn: config.timePerTurn,
+        words_per_player: config.wordsPerPlayer,
+        use_categories: config.useCategories,
+      });
+
+      console.log("Room created successfully:", response);
+      console.log("Room code:", response.room.code);
+      console.log("Player ID:", response.player.id);
+
+      // Navigate to lobby with room data
+      router.push({
+        pathname: "/lobby",
+        params: {
+          playerName,
+          isHost: "true",
+          roomCode: response.room.code,
+          playerId: response.player.id.toString(),
+          playerTeam: response.player.team?.toString() || "1",
+          timePerTurn: response.room.seconds_per_turn.toString(),
+          wordsPerPlayer: response.room.words_per_player.toString(),
+          maxPlayers: config.maxPlayers.toString(),
+          useCategories: response.room.use_categories.toString(),
+          allowPlayerWords: config.allowPlayerWords.toString(),
+          rounds: JSON.stringify(config.rounds),
+        },
+      });
+    } catch (err: any) {
+      console.error("Error creating room:", err);
+      setError(
+        err.response?.data?.error ||
+          "No se pudo crear la sala. Verifica tu conexión.",
+      );
+      Alert.alert(
+        "Error",
+        err.response?.data?.error ||
+          "No se pudo crear la sala. Verifica tu conexión.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const roundNames = [
@@ -219,12 +267,22 @@ export default function ConfigScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
         <Button
-          title="Crear Partida"
+          title={loading ? "Creando sala..." : "Crear Partida"}
           onPress={handleCreateRoom}
           variant="primary"
           size="large"
+          disabled={loading}
         />
+
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#3b82f6" />
+            <Text style={styles.loadingText}>Configurando partida...</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -338,5 +396,22 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
+  },
+  errorText: {
+    color: "#ef4444",
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#3b82f6",
   },
 });

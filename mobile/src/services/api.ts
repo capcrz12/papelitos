@@ -1,12 +1,13 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api';
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -36,15 +37,33 @@ export interface Category {
   word_count: number;
 }
 
+export interface RoomConfig {
+  seconds_per_turn?: number;
+  words_per_player?: number;
+  use_categories?: boolean;
+}
+
 export const gameApi = {
   // Room management
-  createRoom: async (playerName: string): Promise<{ room: Room; player: Player }> => {
-    const response = await api.post('/game/rooms/create_room/', { player_name: playerName });
+  createRoom: async (
+    playerName: string,
+    config?: RoomConfig,
+  ): Promise<{ room: Room; player: Player }> => {
+    const response = await api.post("/game/rooms/create_room/", {
+      player_name: playerName,
+      ...config,
+    });
     return response.data;
   },
 
-  joinRoom: async (roomCode: string, playerName: string): Promise<{ room: Room; player: Player }> => {
-    const response = await api.post(`/game/rooms/${roomCode}/join_room/`, { player_name: playerName });
+  joinRoom: async (
+    roomCode: string,
+    playerName: string,
+  ): Promise<{ room: Room; player: Player }> => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.post(`/game/rooms/${safeCode}/join_room/`, {
+      player_name: playerName,
+    });
     return response.data;
   },
 
@@ -60,7 +79,7 @@ export const gameApi = {
 
   // Categories and words
   getCategories: async (): Promise<Category[]> => {
-    const response = await api.get('/words/categories/');
+    const response = await api.get("/words/categories/");
     return response.data;
   },
 
@@ -70,7 +89,9 @@ export const gameApi = {
   },
 
   getRandomWords: async (categoryId: number, count: number) => {
-    const response = await api.get(`/words/categories/${categoryId}/random_words/?count=${count}`);
+    const response = await api.get(
+      `/words/categories/${categoryId}/random_words/?count=${count}`,
+    );
     return response.data;
   },
 };

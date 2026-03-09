@@ -19,7 +19,15 @@ class RoomViewSet(viewsets.ModelViewSet):
         # TODO: Use real user authentication
         user, _ = User.objects.get_or_create(username=f"user_{request.data.get('player_name', 'anonymous')}")
         
-        room = Room.objects.create(host=user)
+        # Get configuration from request
+        room_config = {
+            'host': user,
+            'seconds_per_turn': request.data.get('seconds_per_turn', 60),
+            'words_per_player': request.data.get('words_per_player', 3),
+            'use_categories': request.data.get('use_categories', False),
+        }
+        
+        room = Room.objects.create(**room_config)
         player = Player.objects.create(
             user=user,
             room=room,
