@@ -1,0 +1,90 @@
+═══════════════════════════════════════════════════════════════════
+  📱 CÓMO INSTALAR EXPO GO COMPATIBLE (SDK 50)
+═══════════════════════════════════════════════════════════════════
+
+⚠️  PROBLEMA:
+Tu Expo Go actual es para SDK 54/55, pero este proyecto usa SDK 50.
+La actualización a SDK 55 requiere React 19 (cambios ENORMES).
+
+✅ SOLUCIÓN:
+Instalar Expo Go compatible con SDK 50 en tu teléfono.
+
+═══════════════════════════════════════════════════════════════════
+  🤖 ANDROID
+═══════════════════════════════════════════════════════════════════
+
+OPCIÓN 1: Descarga directa desde Expo (RECOMENDADO)
+
+1. En tu teléfono, abre el navegador
+2. Ve a esta URL:
+   https://expo.dev/go?sdkVersion=50&platform=android&device=true
+
+3. Descarga el archivo APK
+4. Instala el APK (permite "Instalar desde fuentes desconocidas")
+
+OPCIÓN 2: Usar versión anterior de Play Store
+
+1. Desinstala la Expo Go actual
+2. Busca "Expo Go APK 2.31.1" en tu navegador
+   (Esta es la última versión de SDK 50)
+3. Descarga e instala
+
+═══════════════════════════════════════════════════════════════════
+  🍎 iOS (iPhone/iPad)
+═══════════════════════════════════════════════════════════════════
+
+OPCIÓN 1: Descarga desde Expo
+
+1. En tu iPhone, abre Safari
+2. Ve a esta URL:
+   https://expo.dev/go?sdkVersion=50&platform=ios&device=true
+
+3. Sigue las instrucciones para instalar vía TestFlight
+
+OPCIÓN 2: Actualizar el proyecto (más complicado)
+
+Si prefieres mantener tu Expo Go actual, podemos actualizar
+el proyecto a SDK 54, pero requiere cambios significativos.
+
+═══════════════════════════════════════════════════════════════════
+  🔗 LINKS DIRECTOS
+═══════════════════════════════════════════════════════════════════
+
+Android APK:
+https://expo.dev/go?sdkVersion=50&platform=android&device=true
+
+iOS TestFlight:
+https://expo.dev/go?sdkVersion=50&platform=ios&device=true
+
+Documentación oficial:
+https://docs.expo.dev/archive/expo-go/
+
+═══════════════════════════════════════════════════════════════════
+  ❓ PREGUNTAS FRECUENTES
+═══════════════════════════════════════════════════════════════════
+
+P: ¿Puedo tener dos versiones de Expo Go?
+R: No en el mismo dispositivo. Debes desinstalar la actual primero.
+
+P: ¿Es seguro instalar desde la URL de Expo?
+R: Sí, es la fuente oficial de Expo.
+
+P: ¿Por qué no actualizar el proyecto a SDK 54?
+R: SDK 54/55 usa React 19, que tiene cambios breaking importantes.
+   Para un proyecto nuevo como este, SDK 50 es más estable.
+
+P: ¿Cuánto tiempo tarda la descarga?
+R: El APK de Android es ~50MB, tarda 1-2 minutos en red WiFi.
+
+═══════════════════════════════════════════════════════════════════
+  ✅ DESPUÉS DE INSTALAR
+═══════════════════════════════════════════════════════════════════
+
+1. Abre la nueva Expo Go (SDK 50)
+2. Toca "Enter URL manually"
+3. Ingresa: exp://192.168.1.194:8081
+4. ¡Debería funcionar!
+
+═══════════════════════════════════════════════════════════════════
+
+¿Necesitas ayuda? Lee CONEXION_MOVIL.md para más detalles.
