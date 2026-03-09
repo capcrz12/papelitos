@@ -7,12 +7,15 @@ import {
   Switch,
   TouchableOpacity,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
 
 export default function ConfigScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const playerName = (params.playerName as string) || "Jugador";
+
   const [config, setConfig] = useState({
     timePerTurn: 60,
     wordsPerPlayer: 3,
@@ -35,7 +38,17 @@ export default function ConfigScreen() {
   const handleCreateRoom = async () => {
     // TODO: Call API to create room with config
     console.log("Creating room with config:", config);
-    router.push("/lobby");
+    router.push({
+      pathname: "/lobby",
+      params: {
+        playerName,
+        isHost: "true",
+        // Pass config as stringified JSON
+        timePerTurn: config.timePerTurn.toString(),
+        wordsPerPlayer: config.wordsPerPlayer.toString(),
+        maxPlayers: config.maxPlayers.toString(),
+      },
+    });
   };
 
   const roundNames = [

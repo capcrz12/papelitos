@@ -9,7 +9,7 @@ import {
   Modal,
   TextInput,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
 
@@ -20,23 +20,38 @@ interface Player {
   isMe?: boolean;
 }
 
+function generateRoomCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return Array.from(
+    { length: 4 },
+    () => chars[Math.floor(Math.random() * chars.length)],
+  ).join("");
+}
+
 export default function LobbyScreen() {
-  const [roomCode, setRoomCode] = useState("ABCD");
-  // Initialize with only the current player
+  const router = useRouter();
+  const params = useLocalSearchParams();
+
+  // Get parameters from navigation
+  const playerName = (params.playerName as string) || "Jugador";
+  const isHostParam = params.isHost === "true";
+  const roomCodeParam = (params.roomCode as string) || generateRoomCode();
+
+  const [roomCode, setRoomCode] = useState(roomCodeParam);
+  // Initialize with only the current player using the real name
   const [players, setPlayers] = useState<Player[]>([
-    { id: "1", name: "Carlos", team: 1, isMe: true },
+    { id: "1", name: playerName, team: 1, isMe: true },
   ]);
-  const [isHost, setIsHost] = useState(true);
+  const [isHost, setIsHost] = useState(isHostParam);
   const [editingName, setEditingName] = useState(false);
-  const [newName, setNewName] = useState("Carlos");
+  const [newName, setNewName] = useState(playerName);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [config, setConfig] = useState({
-    timePerTurn: 60,
-    wordsPerPlayer: 3,
-    maxPlayers: 8,
+    timePerTurn: parseInt(params.timePerTurn as string) || 60,
+    wordsPerPlayer: parseInt(params.wordsPerPlayer as string) || 3,
+    maxPlayers: parseInt(params.maxPlayers as string) || 8,
     rounds: 4,
   });
-  const router = useRouter();
 
   // TODO: Listen to WebSocket for new players joining
   useEffect(() => {

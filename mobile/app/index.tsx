@@ -22,8 +22,11 @@ export default function HomeScreen() {
       return;
     }
     setError("");
-    // TODO: Store player name in context or async storage
-    router.push("/config");
+    // Pass player name to config screen
+    router.push({
+      pathname: "/config",
+      params: { playerName: playerName.trim() },
+    });
   };
 
   const joinRoom = () => {
@@ -36,8 +39,14 @@ export default function HomeScreen() {
       return;
     }
     setError("");
-    // TODO: Call API to join room
-    router.push("/lobby");
+    // TODO: Call API to join room, then navigate to lobby
+    router.push({
+      pathname: "/lobby",
+      params: {
+        playerName: playerName.trim(),
+        roomCode: roomCode.trim().toUpperCase(),
+      },
+    });
   };
 
   return (
