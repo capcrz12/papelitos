@@ -20,6 +20,13 @@ export interface Room {
   words_per_player: number;
   use_categories: boolean;
   player_count: number;
+  players?: Array<{
+    id: number;
+    name: string;
+    team: number | null;
+    is_connected: boolean;
+    joined_at?: string;
+  }>;
 }
 
 export interface Player {
@@ -86,6 +93,15 @@ export const gameApi = {
       `/game/rooms/${safeCode}/update_config/`,
       config,
     );
+    return response.data;
+  },
+
+  leaveRoom: async (roomCode: string, playerId: string, playerName: string) => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.post(`/game/rooms/${safeCode}/leave_room/`, {
+      player_id: playerId,
+      player_name: playerName,
+    });
     return response.data;
   },
 

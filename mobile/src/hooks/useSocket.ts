@@ -4,6 +4,7 @@ interface UseSocketProps {
   url: string;
   roomCode: string;
   enabled?: boolean;
+  clientName?: string;
 }
 
 interface GameStateUpdate {
@@ -11,6 +12,8 @@ interface GameStateUpdate {
   data?: any;
   players?: any[];
   room?: any;
+  reason?: string;
+  code?: number;
   player_id?: string;
   team?: number;
 }
@@ -19,17 +22,23 @@ export const useSocket = ({
   url,
   roomCode,
   enabled = true,
+  clientName = "unknown",
 }: UseSocketProps) => {
+  const MAX_RECONNECT_ATTEMPTS = 4;
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [gameState, setGameState] = useState<any>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
+  const stopReconnectRef = useRef(false);
   const eventHandlersRef = useRef<Map<string, Set<Function>>>(new Map());
+  const wsLogPrefix = `[WS][${clientName}]`;
 
   const connect = useCallback(() => {
-    if (!enabled || !roomCode) {
-      console.log("WebSocket connect skipped:", { enabled, roomCode });
+    if (!enabled || !roomCode || stopReconnectRef.current) {
+      console.log(`${wsLogPrefix} connect skipped:`, { enabled, roomCode });
       return;
     }
 
@@ -37,44 +46,67 @@ export const useSocket = ({
     const wsUrl = url.replace("http://", "ws://").replace("https://", "wss://");
     const fullUrl = `${wsUrl}/ws/game/${roomCode}/`;
 
-    console.log("Connecting to WebSocket:", fullUrl);
-    console.log("Room code:", roomCode);
+    console.log(`${wsLogPrefix} connecting to:`, fullUrl);
+    console.log(`${wsLogPrefix} room code:`, roomCode);
 
     const ws = new WebSocket(fullUrl);
     socketRef.current = ws;
     setSocket(ws);
 
     ws.onopen = () => {
-      console.log("WebSocket connected");
+      console.log(`${wsLogPrefix} connected`);
       setIsConnected(true);
     };
 
     ws.onclose = (event) => {
-      console.log("WebSocket disconnected", event.code, event.reason);
+      console.log(`${wsLogPrefix} disconnected`, event.code, event.reason);
       setIsConnected(false);
+      triggerEventHandlers("socket_closed", {
+        code: event.code,
+        reason: event.reason,
+      });
+
+      if (!enabled || !shouldReconnectRef.current) {
+        return;
+      }
 
       // Don't reconnect if room doesn't exist (custom code 4004)
       if (event.code === 4004) {
-        console.error("Room does not exist - not reconnecting");
+        console.error(`${wsLogPrefix} room does not exist - not reconnecting`);
+        stopReconnectRef.current = true;
+        triggerEventHandlers("room_not_found", {});
+        return;
+      }
+
+      reconnectAttemptsRef.current += 1;
+      if (reconnectAttemptsRef.current > MAX_RECONNECT_ATTEMPTS) {
+        console.error(
+          `${wsLogPrefix} max reconnect attempts reached - stopping retries`,
+        );
+        stopReconnectRef.current = true;
         triggerEventHandlers("room_not_found", {});
         return;
       }
 
       // Attempt to reconnect after 2 seconds for other errors
       reconnectTimeoutRef.current = setTimeout(() => {
-        console.log("Attempting to reconnect...");
+        console.log(
+          `${wsLogPrefix} attempting reconnect (${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})...`,
+        );
         connect();
       }, 2000);
     };
 
     ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      console.error(`${wsLogPrefix} error:`, error);
     };
 
     ws.onmessage = (event) => {
       try {
+        // A valid message means the connection is healthy; allow future retries if needed.
+        reconnectAttemptsRef.current = 0;
         const message: GameStateUpdate = JSON.parse(event.data);
-        console.log("WebSocket message received:", message);
+        console.log(`${wsLogPrefix} message received:`, message);
 
         // Handle different message types
         switch (message.type) {
@@ -97,6 +129,10 @@ export const useSocket = ({
           case "room_config_updated":
             triggerEventHandlers("room_config_updated", message);
             break;
+          case "room_closed":
+            stopReconnectRef.current = true;
+            triggerEventHandlers("room_closed", message);
+            break;
           case "game_started":
             setGameState(message.data);
             triggerEventHandlers("game_started", message.data);
@@ -110,10 +146,10 @@ export const useSocket = ({
             triggerEventHandlers("turn_ended", message.data);
             break;
           default:
-            console.log("Unknown message type:", message.type);
+            console.log(`${wsLogPrefix} unknown message type:`, message.type);
         }
       } catch (error) {
-        console.error("Error parsing WebSocket message:", error);
+        console.error(`${wsLogPrefix} error parsing message:`, error);
       }
     };
 
@@ -128,9 +164,14 @@ export const useSocket = ({
   };
 
   useEffect(() => {
+    shouldReconnectRef.current = enabled;
+    if (!enabled) {
+      stopReconnectRef.current = false;
+    }
     const ws = connect();
 
     return () => {
+      shouldReconnectRef.current = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -159,9 +200,9 @@ export const useSocket = ({
     if (socket && isConnected && socket.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({ type, ...data });
       socket.send(message);
-      console.log("Sent WebSocket message:", message);
+      console.log(`${wsLogPrefix} sent message:`, message);
     } else {
-      console.warn("Cannot send message: WebSocket not connected");
+      console.warn(`${wsLogPrefix} cannot send: WebSocket not connected`);
     }
   };
 

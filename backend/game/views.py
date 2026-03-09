@@ -128,6 +128,65 @@ class RoomViewSet(viewsets.ModelViewSet):
             'room': RoomSerializer(room).data
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'])
+    def leave_room(self, request, code=None):
+        """Leave room. If host leaves, close room for everyone."""
+        room = self.get_object()
+        player_id = request.data.get('player_id')
+        player_name = request.data.get('player_name')
+
+        player = None
+        if player_id:
+            player = room.players.filter(id=player_id).first()
+        if not player and player_name:
+            player = room.players.filter(name=player_name).first()
+
+        if not player:
+            return Response({'error': 'Player not found in room'}, status=status.HTTP_404_NOT_FOUND)
+
+        channel_layer = get_channel_layer()
+
+        # If host leaves, close room for all users
+        if player.user_id == room.host_id:
+            async_to_sync(channel_layer.group_send)(
+                f'game_{room.code}',
+                {
+                    'type': 'room_closed',
+                    'reason': 'host_left',
+                    'room_code': room.code,
+                    'force_exit': True,
+                }
+            )
+            room.delete()
+            return Response({'message': 'Host left. Room closed.'}, status=status.HTTP_200_OK)
+
+        # Normal player leaves room
+        left_player_id = player.id
+        player.delete()
+
+        # If room is empty after leaving, delete it.
+        if room.players.count() == 0:
+            room.delete()
+            return Response({'message': 'Player left. Empty room deleted.'}, status=status.HTTP_200_OK)
+
+        remaining_players = list(room.players.values('id', 'name', 'team', 'is_connected'))
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'player_left',
+                'player_id': left_player_id,
+            }
+        )
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'player_update',
+                'players': remaining_players,
+            }
+        )
+
+        return Response({'message': 'Player left room'}, status=status.HTTP_200_OK)
+
 
 class GameStateViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = GameState.objects.all()

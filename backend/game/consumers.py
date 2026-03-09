@@ -14,7 +14,9 @@ class GameConsumer(AsyncWebsocketConsumer):
         # Verify room exists before connecting
         room_exists = await self.check_room_exists()
         if not room_exists:
-            await self.close(code=4004)  # Custom close code for room not found
+            # Accept then close so client reliably receives the custom close code.
+            await self.accept()
+            await self.close(code=4004)
             return
         
         # Join room group
@@ -182,11 +184,25 @@ class GameConsumer(AsyncWebsocketConsumer):
             'players': event['players']
         }))
 
+    async def player_left(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'player_left',
+            'player_id': event['player_id']
+        }))
+
     async def room_config_updated(self, event):
         await self.send(text_data=json.dumps({
             'type': 'room_config_updated',
             'room': event['room']
         }))
+
+    async def room_closed(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'room_closed',
+            'reason': event.get('reason', 'closed')
+        }))
+        # Force-close each client socket so frontend handles exit immediately.
+        await self.close(code=4006)
     
     # Database queries
     @database_sync_to_async

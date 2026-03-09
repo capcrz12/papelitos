@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,9 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Modal,
-  TextInput,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
 import { useSocket } from "../src/hooks/useSocket";
@@ -22,16 +21,10 @@ interface Player {
   isMe?: boolean;
 }
 
-function generateRoomCode() {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  return Array.from(
-    { length: 4 },
-    () => chars[Math.floor(Math.random() * chars.length)],
-  ).join("");
-}
-
 export default function LobbyScreen() {
   const router = useRouter();
+  const navigation = useNavigation<any>();
+  const isFocused = useIsFocused();
   const params = useLocalSearchParams();
 
   // Get parameters from navigation
@@ -58,7 +51,7 @@ export default function LobbyScreen() {
     return null;
   }
 
-  const [roomCode, setRoomCode] = useState(roomCodeParam);
+  const roomCode = roomCodeParam;
   // Initialize with only the current player using real data from backend
   const [players, setPlayers] = useState<Player[]>([
     { id: playerId, name: playerName, team: playerTeam, isMe: true },
@@ -66,7 +59,37 @@ export default function LobbyScreen() {
   const [isHost, setIsHost] = useState(isHostParam);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(playerName);
-  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [systemNotice, setSystemNotice] = useState("");
+  const roomClosedHandledRef = useRef(false);
+  const allowNavigationRef = useRef(false);
+  const closeCheckInFlightRef = useRef(false);
+  const autoRedirectTimerRef = useRef<any>(null);
+
+  const notifyAndRedirectToMenu = (message: string) => {
+    if (roomClosedHandledRef.current) return;
+    roomClosedHandledRef.current = true;
+    setSystemNotice(message);
+
+    if (autoRedirectTimerRef.current) {
+      clearTimeout(autoRedirectTimerRef.current);
+    }
+
+    autoRedirectTimerRef.current = setTimeout(() => {
+      allowNavigationRef.current = true;
+      router.replace("/");
+    }, 1200);
+  };
+
+  const redirectIfRoomNotFound = (err: any): boolean => {
+    if (err?.response?.status !== 404 || roomClosedHandledRef.current) {
+      return false;
+    }
+
+    notifyAndRedirectToMenu(
+      "La sala ya no existe. Redirigiendo al menú principal...",
+    );
+    return true;
+  };
 
   const parseBool = (value: string | undefined, fallback = false) => {
     if (value === undefined) return fallback;
@@ -96,11 +119,13 @@ export default function LobbyScreen() {
   const { socket, isConnected, emit, on, off } = useSocket({
     url: wsUrl,
     roomCode: roomCode,
-    enabled: true,
+    enabled: isFocused,
+    clientName: playerName,
   });
 
   // Listen to WebSocket for new players joining
   useEffect(() => {
+    if (!isFocused) return;
     if (!on || !off) return;
 
     const normalizePlayers = (serverPlayers: any[]): Player[] =>
@@ -113,9 +138,29 @@ export default function LobbyScreen() {
 
     // Listen for room not found error
     const handleRoomNotFound = () => {
-      Alert.alert("Sala no encontrada", "La sala no existe o ha expirado", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      notifyAndRedirectToMenu(
+        "La sala no existe o ha expirado. Redirigiendo al menú principal...",
+      );
+    };
+
+    const handleRoomClosed = (data: any) => {
+      if (roomClosedHandledRef.current) return;
+      roomClosedHandledRef.current = true;
+
+      // Host already triggers local leave flow; avoid duplicate dialogs.
+      if (isHost) {
+        allowNavigationRef.current = true;
+        router.replace("/");
+        return;
+      }
+
+      const reason = data?.reason;
+      const message =
+        reason === "host_left"
+          ? "El anfitrión ha cerrado la sala. Serás redirigido al menú principal."
+          : "La sala se ha cerrado. Serás redirigido al menú principal.";
+
+      notifyAndRedirectToMenu(message);
     };
 
     // Listen for player joined events
@@ -177,12 +222,26 @@ export default function LobbyScreen() {
       }));
     };
 
+    const checkRoomAfterSocketClose = async () => {
+      if (closeCheckInFlightRef.current || roomClosedHandledRef.current) return;
+      closeCheckInFlightRef.current = true;
+      try {
+        await gameApi.getRoom(roomCode);
+      } catch (err: any) {
+        redirectIfRoomNotFound(err);
+      } finally {
+        closeCheckInFlightRef.current = false;
+      }
+    };
+
     on("room_not_found", handleRoomNotFound);
     on("player_update", handlePlayerUpdate);
     on("player_joined", handlePlayerJoined);
     on("player_left", handlePlayerLeft);
     on("team_changed", handleTeamChanged);
     on("room_config_updated", handleRoomConfigUpdated);
+    on("room_closed", handleRoomClosed);
+    on("socket_closed", checkRoomAfterSocketClose);
 
     return () => {
       off("room_not_found", handleRoomNotFound);
@@ -191,8 +250,118 @@ export default function LobbyScreen() {
       off("player_left", handlePlayerLeft);
       off("team_changed", handleTeamChanged);
       off("room_config_updated", handleRoomConfigUpdated);
+      off("room_closed", handleRoomClosed);
+      off("socket_closed", checkRoomAfterSocketClose);
     };
-  }, [on, off, playerId, router]);
+  }, [isFocused, on, off, playerId, router]);
+
+  // Fallback sync: keeps all clients consistent even if a WS event is missed.
+  useEffect(() => {
+    if (!isFocused || !roomCode) return;
+
+    let isMounted = true;
+
+    const syncRoomState = async () => {
+      try {
+        const room = await gameApi.getRoom(roomCode);
+        if (!isMounted) return;
+
+        if (Array.isArray(room.players)) {
+          setPlayers(
+            room.players.map((p) => ({
+              id: String(p.id),
+              name: p.name,
+              team: p.team ?? null,
+              isMe: String(p.id) === playerId,
+            })),
+          );
+        }
+
+        setConfig((prev) => ({
+          ...prev,
+          timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
+          wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
+          useCategories: room.use_categories ?? prev.useCategories,
+        }));
+      } catch (err: any) {
+        if (!isMounted) return;
+        redirectIfRoomNotFound(err);
+      }
+    };
+
+    syncRoomState();
+    const timer = setInterval(syncRoomState, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [isFocused, roomCode, playerId, router]);
+
+  const confirmLeaveRoom = () => {
+    const title = isHost ? "Cerrar sala" : "Salir de la sala";
+    const message = isHost
+      ? "Si sales, se cerrará la sala y todos los jugadores serán expulsados."
+      : "¿Seguro que quieres salir de la sala?";
+
+    Alert.alert(title, message, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: isHost ? "Cerrar sala" : "Salir",
+        style: "destructive",
+        onPress: leaveRoom,
+      },
+    ]);
+  };
+
+  // Prevent going back to config/home without explicit leave confirmation.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+      if (allowNavigationRef.current || roomClosedHandledRef.current) {
+        return;
+      }
+
+      e.preventDefault();
+      confirmLeaveRoom();
+    });
+
+    return unsubscribe;
+  }, [navigation, isHost, roomCode, playerId, playerName]);
+
+  useEffect(() => {
+    return () => {
+      if (autoRedirectTimerRef.current) {
+        clearTimeout(autoRedirectTimerRef.current);
+      }
+    };
+  }, []);
+
+  const leaveRoom = async () => {
+    try {
+      await gameApi.leaveRoom(roomCode, playerId, playerName);
+
+      if (isHost) {
+        Alert.alert("Sala cerrada", "Has cerrado la sala.", [
+          {
+            text: "OK",
+            onPress: () => {
+              allowNavigationRef.current = true;
+              router.replace("/");
+            },
+          },
+        ]);
+      } else {
+        allowNavigationRef.current = true;
+        router.replace("/");
+      }
+    } catch (err: any) {
+      console.error("Error leaving room:", err);
+      Alert.alert(
+        "Error",
+        err?.response?.data?.error || "No se pudo salir de la sala",
+      );
+    }
+  };
 
   const myPlayer = players.find((p) => p.isMe);
 
@@ -263,12 +432,15 @@ export default function LobbyScreen() {
 
   return (
     <View style={styles.container}>
+      {!!systemNotice && (
+        <View style={styles.noticeBanner}>
+          <Text style={styles.noticeText}>{systemNotice}</Text>
+        </View>
+      )}
+
       {/* Header with room code */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={confirmLeaveRoom} style={styles.backButton}>
           <Text style={styles.backButtonText}>← Salir</Text>
         </TouchableOpacity>
         <Text style={styles.roomCodeLabel}>Código de sala</Text>
@@ -486,6 +658,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+  },
+  noticeBanner: {
+    backgroundColor: "#fee2e2",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#fecaca",
+  },
+  noticeText: {
+    color: "#991b1b",
+    fontSize: 13,
+    textAlign: "center",
+    fontWeight: "600",
   },
   header: {
     backgroundColor: "white",
