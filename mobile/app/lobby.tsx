@@ -8,7 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useIsFocused, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
 import { useSocket } from "../src/hooks/useSocket";
@@ -24,7 +24,6 @@ interface Player {
 export default function LobbyScreen() {
   const router = useRouter();
   const navigation = useNavigation<any>();
-  const isFocused = useIsFocused();
   const params = useLocalSearchParams();
 
   // Get parameters from navigation
@@ -64,6 +63,7 @@ export default function LobbyScreen() {
   const allowNavigationRef = useRef(false);
   const closeCheckInFlightRef = useRef(false);
   const autoRedirectTimerRef = useRef<any>(null);
+  const phaseNavigationDoneRef = useRef(false);
 
   const notifyAndRedirectToMenu = (message: string) => {
     if (roomClosedHandledRef.current) return;
@@ -113,19 +113,23 @@ export default function LobbyScreen() {
     allowPlayerWords: parseBool(params.allowPlayerWords as string, true),
     rounds: parseRounds(params.rounds as string),
   });
+  const configRef = useRef(config);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
 
   // WebSocket connection
   const wsUrl = process.env.EXPO_PUBLIC_WS_URL || "http://localhost:8000";
   const { socket, isConnected, emit, on, off } = useSocket({
     url: wsUrl,
     roomCode: roomCode,
-    enabled: isFocused,
+    enabled: true,
     clientName: playerName,
   });
 
   // Listen to WebSocket for new players joining
   useEffect(() => {
-    if (!isFocused) return;
     if (!on || !off) return;
 
     const normalizePlayers = (serverPlayers: any[]): Player[] =>
@@ -218,8 +222,73 @@ export default function LobbyScreen() {
         ...prev,
         timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
         wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
+        maxPlayers: room.max_players ?? prev.maxPlayers,
         useCategories: room.use_categories ?? prev.useCategories,
+        allowPlayerWords: room.allow_player_words ?? prev.allowPlayerWords,
+        rounds:
+          Array.isArray(room.active_rounds) && room.active_rounds.length === 4
+            ? room.active_rounds
+            : prev.rounds,
       }));
+
+      if (room.game_started) {
+        navigateToPhase(room, room.game_phase);
+      }
+    };
+
+    const navigateToPhase = (roomData?: any, phaseOverride?: string) => {
+      if (phaseNavigationDoneRef.current) return;
+      const phase = phaseOverride || roomData?.game_phase;
+      const nextPath =
+        phase === "word_submission" ? "/word-submission" : "/game";
+      phaseNavigationDoneRef.current = true;
+      allowNavigationRef.current = true;
+
+      const currentConfig = configRef.current;
+
+      router.replace({
+        pathname: nextPath,
+        params: {
+          roomCode,
+          playerId,
+          playerName,
+          isHost: isHost ? "true" : "false",
+          timePerTurn: String(
+            roomData?.seconds_per_turn ?? currentConfig.timePerTurn,
+          ),
+          wordsPerPlayer: String(
+            roomData?.words_per_player ?? currentConfig.wordsPerPlayer,
+          ),
+          allowPlayerWords: String(
+            roomData?.allow_player_words ?? currentConfig.allowPlayerWords,
+          ),
+          rounds: JSON.stringify(
+            roomData?.active_rounds ?? currentConfig.rounds,
+          ),
+        },
+      });
+    };
+
+    const handleGameStarted = (data: any) => {
+      const room = data?.room;
+      const phase = data?.phase || room?.game_phase;
+
+      if (room) {
+        setConfig((prev) => ({
+          ...prev,
+          timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
+          wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
+          maxPlayers: room.max_players ?? prev.maxPlayers,
+          useCategories: room.use_categories ?? prev.useCategories,
+          allowPlayerWords: room.allow_player_words ?? prev.allowPlayerWords,
+          rounds:
+            Array.isArray(room.active_rounds) && room.active_rounds.length === 4
+              ? room.active_rounds
+              : prev.rounds,
+        }));
+      }
+
+      navigateToPhase(room, phase);
     };
 
     const checkRoomAfterSocketClose = async () => {
@@ -240,6 +309,7 @@ export default function LobbyScreen() {
     on("player_left", handlePlayerLeft);
     on("team_changed", handleTeamChanged);
     on("room_config_updated", handleRoomConfigUpdated);
+    on("game_started", handleGameStarted);
     on("room_closed", handleRoomClosed);
     on("socket_closed", checkRoomAfterSocketClose);
 
@@ -250,14 +320,15 @@ export default function LobbyScreen() {
       off("player_left", handlePlayerLeft);
       off("team_changed", handleTeamChanged);
       off("room_config_updated", handleRoomConfigUpdated);
+      off("game_started", handleGameStarted);
       off("room_closed", handleRoomClosed);
       off("socket_closed", checkRoomAfterSocketClose);
     };
-  }, [isFocused, on, off, playerId, router]);
+  }, [isHost, off, on, playerId, playerName, roomCode, router]);
 
-  // Fallback sync: keeps all clients consistent even if a WS event is missed.
+  // One-shot sync on mount; afterwards rely on websocket events.
   useEffect(() => {
-    if (!isFocused || !roomCode) return;
+    if (!roomCode) return;
 
     let isMounted = true;
 
@@ -281,8 +352,36 @@ export default function LobbyScreen() {
           ...prev,
           timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
           wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
+          maxPlayers: room.max_players ?? prev.maxPlayers,
           useCategories: room.use_categories ?? prev.useCategories,
+          allowPlayerWords: room.allow_player_words ?? prev.allowPlayerWords,
+          rounds:
+            Array.isArray(room.active_rounds) && room.active_rounds.length === 4
+              ? room.active_rounds
+              : prev.rounds,
         }));
+
+        if (room.game_started && !phaseNavigationDoneRef.current) {
+          const nextPath =
+            room.game_phase === "word_submission"
+              ? "/word-submission"
+              : "/game";
+          phaseNavigationDoneRef.current = true;
+          allowNavigationRef.current = true;
+          router.replace({
+            pathname: nextPath,
+            params: {
+              roomCode,
+              playerId,
+              playerName,
+              isHost: isHost ? "true" : "false",
+              timePerTurn: String(room.seconds_per_turn),
+              wordsPerPlayer: String(room.words_per_player),
+              allowPlayerWords: String(room.allow_player_words),
+              rounds: JSON.stringify(room.active_rounds ?? config.rounds),
+            },
+          });
+        }
       } catch (err: any) {
         if (!isMounted) return;
         redirectIfRoomNotFound(err);
@@ -290,13 +389,10 @@ export default function LobbyScreen() {
     };
 
     syncRoomState();
-    const timer = setInterval(syncRoomState, 4000);
-
     return () => {
       isMounted = false;
-      clearInterval(timer);
     };
-  }, [isFocused, roomCode, playerId, router]);
+  }, [isHost, playerId, playerName, roomCode, router]);
 
   const confirmLeaveRoom = () => {
     const title = isHost ? "Cerrar sala" : "Salir de la sala";
@@ -380,20 +476,15 @@ export default function LobbyScreen() {
       return;
     }
 
-    // Call backend to start game
-    gameApi
-      .startGame(roomCode)
-      .then(() => {
-        router.push("/game");
-      })
-      .catch((err: any) => {
-        console.error("Error starting game:", err);
-        const backendError = err?.response?.data?.error;
-        Alert.alert(
-          "No se pudo iniciar",
-          backendError || "No se pudo iniciar la partida",
-        );
-      });
+    // Host starts once and server broadcasts next screen to every player.
+    gameApi.startGameAsHost(roomCode, playerId).catch((err: any) => {
+      console.error("Error starting game:", err);
+      const backendError = err?.response?.data?.error;
+      Alert.alert(
+        "No se pudo iniciar",
+        backendError || "No se pudo iniciar la partida",
+      );
+    });
   };
 
   const changeTeam = (playerId: string, newTeam: number) => {
@@ -623,6 +714,12 @@ export default function LobbyScreen() {
             <Text style={styles.settingLabel}>Categorías:</Text>
             <Text style={styles.settingValue}>
               {config.useCategories ? "Sí" : "No"}
+            </Text>
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Jugadores crean palabras:</Text>
+            <Text style={styles.settingValue}>
+              {config.allowPlayerWords ? "Sí" : "No"}
             </Text>
           </View>
         </View>

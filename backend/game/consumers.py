@@ -26,6 +26,15 @@ class GameConsumer(AsyncWebsocketConsumer):
         )
         
         await self.accept()
+
+        # Push current room snapshot on connect so late/reconnected clients
+        # can immediately sync phase/config without waiting for a new event.
+        room_snapshot = await self.get_room_snapshot()
+        if room_snapshot:
+            await self.send(text_data=json.dumps({
+                'type': 'room_config_updated',
+                'room': room_snapshot
+            }))
         
         # Send current game state
         game_state = await self.get_game_state()
@@ -161,7 +170,21 @@ class GameConsumer(AsyncWebsocketConsumer):
     async def game_started(self, event):
         await self.send(text_data=json.dumps({
             'type': 'game_started',
-            'game_state': event['game_state']
+            'data': event.get('data', {'game_state': event.get('game_state')})
+        }))
+
+    async def word_submission_progress(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'word_submission_progress',
+            'submitted_count': event['submitted_count'],
+            'total_players': event['total_players'],
+            'player_id': event['player_id'],
+        }))
+
+    async def words_phase_completed(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'words_phase_completed',
+            'room': event['room'],
         }))
     
     async def word_update(self, event):
@@ -229,6 +252,27 @@ class GameConsumer(AsyncWebsocketConsumer):
     def get_players(self):
         room = Room.objects.get(code=self.room_code)
         return list(room.players.values('id', 'name', 'team', 'is_connected'))
+
+    @database_sync_to_async
+    def get_room_snapshot(self):
+        try:
+            room = Room.objects.get(code=self.room_code)
+            return {
+                'id': room.id,
+                'code': room.code,
+                'is_active': room.is_active,
+                'game_started': room.game_started,
+                'seconds_per_turn': room.seconds_per_turn,
+                'words_per_player': room.words_per_player,
+                'use_categories': room.use_categories,
+                'allow_player_words': room.allow_player_words,
+                'max_players': room.max_players,
+                'active_rounds': room.active_rounds,
+                'game_phase': room.game_phase,
+                'created_at': room.created_at.isoformat(),
+            }
+        except Room.DoesNotExist:
+            return None
     
     @database_sync_to_async
     def update_player_team(self, player_id, new_team):

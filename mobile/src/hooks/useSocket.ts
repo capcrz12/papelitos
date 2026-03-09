@@ -137,6 +137,12 @@ export const useSocket = ({
             setGameState(message.data);
             triggerEventHandlers("game_started", message.data);
             break;
+          case "word_submission_progress":
+            triggerEventHandlers("word_submission_progress", message);
+            break;
+          case "words_phase_completed":
+            triggerEventHandlers("words_phase_completed", message);
+            break;
           case "word_update":
             setGameState((prev: any) => ({ ...prev, ...message.data }));
             triggerEventHandlers("word_update", message.data);

@@ -63,6 +63,10 @@ export default function HomeScreen() {
           isHost: "false",
           timePerTurn: response.room.seconds_per_turn.toString(),
           wordsPerPlayer: response.room.words_per_player.toString(),
+          maxPlayers: response.room.max_players.toString(),
+          useCategories: response.room.use_categories.toString(),
+          allowPlayerWords: response.room.allow_player_words.toString(),
+          rounds: JSON.stringify(response.room.active_rounds),
         },
       });
     } catch (err: any) {

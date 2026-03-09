@@ -27,6 +27,10 @@ class RoomViewSet(viewsets.ModelViewSet):
             'seconds_per_turn': request.data.get('seconds_per_turn', 60),
             'words_per_player': request.data.get('words_per_player', 3),
             'use_categories': request.data.get('use_categories', False),
+            'allow_player_words': request.data.get('allow_player_words', True),
+            'max_players': request.data.get('max_players', 8),
+            'active_rounds': request.data.get('active_rounds', [True, True, True, True]),
+            'game_phase': 'lobby',
         }
         
         room = Room.objects.create(**room_config)
@@ -49,6 +53,9 @@ class RoomViewSet(viewsets.ModelViewSet):
         
         if room.game_started:
             return Response({'error': 'Game already started'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if room.players.count() >= room.max_players:
+            return Response({'error': 'Room is full'}, status=status.HTTP_400_BAD_REQUEST)
         
         # TODO: Use real user authentication
         user, _ = User.objects.get_or_create(username=f"user_{request.data.get('player_name', 'anonymous')}")
@@ -76,24 +83,64 @@ class RoomViewSet(viewsets.ModelViewSet):
     def start_game(self, request, code=None):
         """Start the game."""
         room = self.get_object()
+        player_id = request.data.get('player_id')
+
+        if player_id:
+            host_player = room.players.filter(id=player_id).first()
+            if not host_player or host_player.user_id != room.host_id:
+                return Response({'error': 'Only the host can start the game'}, status=status.HTTP_403_FORBIDDEN)
         
         if room.players.count() < 4:
             return Response({'error': 'Need at least 4 players'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         room.game_started = True
+        room.game_phase = 'word_submission' if room.allow_player_words else 'playing'
         room.save()
+
+        room.players.update(words_submitted=False)
         
         # Create game state
         first_player = room.players.filter(team=1).first()
-        game_state = GameState.objects.create(
+        game_state, _ = GameState.objects.get_or_create(
             room=room,
-            current_player=first_player,
-            current_round=1
+            defaults={
+                'current_player': first_player,
+                'current_round': 1,
+            }
+        )
+
+        game_state.current_player = first_player
+        game_state.current_round = 1
+        game_state.save()
+
+        room_data = RoomSerializer(room).data
+        game_data = GameStateSerializer(game_state).data
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'game_started',
+                'data': {
+                    'room': room_data,
+                    'game_state': game_data,
+                    'phase': room.game_phase,
+                }
+            }
+        )
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'room_config_updated',
+                'room': room_data,
+            }
         )
         
         return Response({
             'message': 'Game started',
-            'game_state': GameStateSerializer(game_state).data
+            'room': room_data,
+            'game_state': game_data,
+            'phase': room.game_phase,
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['patch'])
@@ -111,6 +158,12 @@ class RoomViewSet(viewsets.ModelViewSet):
             room.words_per_player = request.data.get('words_per_player')
         if 'use_categories' in request.data:
             room.use_categories = request.data.get('use_categories')
+        if 'allow_player_words' in request.data:
+            room.allow_player_words = request.data.get('allow_player_words')
+        if 'max_players' in request.data:
+            room.max_players = request.data.get('max_players')
+        if 'active_rounds' in request.data:
+            room.active_rounds = request.data.get('active_rounds')
 
         room.save()
 
@@ -186,6 +239,97 @@ class RoomViewSet(viewsets.ModelViewSet):
         )
 
         return Response({'message': 'Player left room'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def submit_player_words(self, request, code=None):
+        """Allow each player to submit their own words before the game starts."""
+        room = self.get_object()
+        player_id = request.data.get('player_id')
+        words = request.data.get('words', [])
+
+        if room.game_phase != 'word_submission':
+            return Response({'error': 'Word submission phase is not active'}, status=status.HTTP_400_BAD_REQUEST)
+
+        player = room.players.filter(id=player_id).first()
+        if not player:
+            return Response({'error': 'Player not found in room'}, status=status.HTTP_404_NOT_FOUND)
+
+        if player.words_submitted:
+            return Response({'error': 'Player already submitted words'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(words, list) or len(words) == 0:
+            return Response({'error': 'Provide at least one word'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cleaned_words = []
+        for raw_word in words:
+            value = (raw_word or '').strip()
+            if value:
+                cleaned_words.append(value)
+
+        if len(cleaned_words) != room.words_per_player:
+            return Response(
+                {'error': f'You must submit exactly {room.words_per_player} words'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        for text in cleaned_words:
+            Word.objects.create(room=room, text=text, created_by=player)
+
+        player.words_submitted = True
+        player.save()
+
+        submitted_count = room.players.filter(words_submitted=True).count()
+        total_players = room.players.count()
+        all_submitted = submitted_count == total_players
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'word_submission_progress',
+                'submitted_count': submitted_count,
+                'total_players': total_players,
+                'player_id': player.id,
+            }
+        )
+
+        if all_submitted:
+            room.game_phase = 'playing'
+            room.save()
+            async_to_sync(channel_layer.group_send)(
+                f'game_{room.code}',
+                {
+                    'type': 'words_phase_completed',
+                    'room': RoomSerializer(room).data,
+                }
+            )
+
+        return Response(
+            {
+                'submitted_count': submitted_count,
+                'total_players': total_players,
+                'all_submitted': all_submitted,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['get'])
+    def words_submission_status(self, request, code=None):
+        """Get word submission progress for the current room."""
+        room = self.get_object()
+        submitted_count = room.players.filter(words_submitted=True).count()
+        total_players = room.players.count()
+
+        return Response(
+            {
+                'submitted_count': submitted_count,
+                'total_players': total_players,
+                'all_submitted': submitted_count == total_players,
+                'phase': room.game_phase,
+                'words_per_player': room.words_per_player,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class GameStateViewSet(viewsets.ReadOnlyModelViewSet):

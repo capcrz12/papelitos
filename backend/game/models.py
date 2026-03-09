@@ -21,6 +21,10 @@ class Room(models.Model):
     seconds_per_turn = models.IntegerField(default=60)
     words_per_player = models.IntegerField(default=3)
     use_categories = models.BooleanField(default=False)
+    allow_player_words = models.BooleanField(default=True)
+    max_players = models.IntegerField(default=8)
+    active_rounds = models.JSONField(default=list)
+    game_phase = models.CharField(max_length=32, default='lobby')
     
     def __str__(self):
         return f"Room {self.code}"
@@ -34,6 +38,7 @@ class Player(models.Model):
     team = models.IntegerField(choices=[(1, 'Team 1'), (2, 'Team 2')], null=True, blank=True)
     joined_at = models.DateTimeField(auto_now_add=True)
     is_connected = models.BooleanField(default=True)
+    words_submitted = models.BooleanField(default=False)
     
     class Meta:
         unique_together = ['user', 'room']

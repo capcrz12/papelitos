@@ -8,7 +8,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useGestureDetector } from "../src/hooks/useGestureDetector";
 
 const { height } = Dimensions.get("window");
@@ -27,10 +27,28 @@ const ROUNDS = [
 
 export default function GameScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+
+  const parseRounds = (value: string | undefined) => {
+    if (!value) return [true, true, true, true];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+    } catch {}
+    return [true, true, true, true];
+  };
+
+  const configuredTimePerTurn = parseInt(
+    (params.timePerTurn as string) || "60",
+    10,
+  );
+  const enabledRoundsFlags = parseRounds(params.rounds as string);
+  const activeRounds = ROUNDS.filter((_, index) => enabledRoundsFlags[index]);
+
   const [currentRound, setCurrentRound] = useState(1);
   const [isMyTurn, setIsMyTurn] = useState(true);
   const [currentWord, setCurrentWord] = useState("Elefante");
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(configuredTimePerTurn);
   const [score, setScore] = useState({ team1: 0, team2: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [wordsGuessed, setWordsGuessed] = useState(0);
@@ -95,7 +113,7 @@ export default function GameScreen() {
   const startTurn = () => {
     setIsPlaying(true);
     setGesturesEnabled(false);
-    setTimeLeft(60);
+    setTimeLeft(configuredTimePerTurn);
     setWordsGuessed(0);
   };
 
@@ -132,8 +150,8 @@ export default function GameScreen() {
     <View style={styles.container}>
       <View style={styles.topBar}>
         <Text style={styles.roundText}>
-          {ROUNDS[currentRound - 1].icon} Ronda {currentRound}:{" "}
-          {ROUNDS[currentRound - 1].name}
+          {(activeRounds[currentRound - 1] || ROUNDS[0]).icon} Ronda{" "}
+          {currentRound}: {(activeRounds[currentRound - 1] || ROUNDS[0]).name}
         </Text>
         <Text style={styles.timerText}>{timeLeft}s</Text>
       </View>
@@ -146,7 +164,7 @@ export default function GameScreen() {
       {!isPlaying ? (
         <View style={styles.startContainer}>
           <Text style={styles.roundDescription}>
-            {ROUNDS[currentRound - 1].description}
+            {(activeRounds[currentRound - 1] || ROUNDS[0]).description}
           </Text>
           <TouchableOpacity style={styles.startButton} onPress={startTurn}>
             <Text style={styles.startButtonText}>Comenzar mi turno</Text>

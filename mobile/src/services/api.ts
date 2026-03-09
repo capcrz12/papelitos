@@ -19,12 +19,17 @@ export interface Room {
   seconds_per_turn: number;
   words_per_player: number;
   use_categories: boolean;
+  allow_player_words: boolean;
+  max_players: number;
+  active_rounds: boolean[];
+  game_phase: string;
   player_count: number;
   players?: Array<{
     id: number;
     name: string;
     team: number | null;
     is_connected: boolean;
+    words_submitted?: boolean;
     joined_at?: string;
   }>;
 }
@@ -48,6 +53,9 @@ export interface RoomConfig {
   seconds_per_turn?: number;
   words_per_player?: number;
   use_categories?: boolean;
+  allow_player_words?: boolean;
+  max_players?: number;
+  active_rounds?: boolean[];
 }
 
 export const gameApi = {
@@ -84,6 +92,14 @@ export const gameApi = {
     return response.data;
   },
 
+  startGameAsHost: async (roomCode: string, playerId: string) => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.post(`/game/rooms/${safeCode}/start_game/`, {
+      player_id: playerId,
+    });
+    return response.data;
+  },
+
   updateRoomConfig: async (
     roomCode: string,
     config: RoomConfig,
@@ -102,6 +118,30 @@ export const gameApi = {
       player_id: playerId,
       player_name: playerName,
     });
+    return response.data;
+  },
+
+  submitPlayerWords: async (
+    roomCode: string,
+    playerId: string,
+    words: string[],
+  ) => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.post(
+      `/game/rooms/${safeCode}/submit_player_words/`,
+      {
+        player_id: playerId,
+        words,
+      },
+    );
+    return response.data;
+  },
+
+  getWordsSubmissionStatus: async (roomCode: string) => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.get(
+      `/game/rooms/${safeCode}/words_submission_status/`,
+    );
     return response.data;
   },
 

@@ -82,6 +82,9 @@ export default function ConfigScreen() {
           seconds_per_turn: config.timePerTurn,
           words_per_player: config.wordsPerPlayer,
           use_categories: config.useCategories,
+          allow_player_words: config.allowPlayerWords,
+          max_players: config.maxPlayers,
+          active_rounds: config.rounds,
         });
 
         // Return to the same room with updated settings
@@ -95,10 +98,10 @@ export default function ConfigScreen() {
             playerTeam,
             timePerTurn: response.room.seconds_per_turn.toString(),
             wordsPerPlayer: response.room.words_per_player.toString(),
-            maxPlayers: config.maxPlayers.toString(),
+            maxPlayers: response.room.max_players.toString(),
             useCategories: response.room.use_categories.toString(),
-            allowPlayerWords: config.allowPlayerWords.toString(),
-            rounds: JSON.stringify(config.rounds),
+            allowPlayerWords: response.room.allow_player_words.toString(),
+            rounds: JSON.stringify(response.room.active_rounds),
           },
         });
       } else {
@@ -107,6 +110,9 @@ export default function ConfigScreen() {
           seconds_per_turn: config.timePerTurn,
           words_per_player: config.wordsPerPlayer,
           use_categories: config.useCategories,
+          allow_player_words: config.allowPlayerWords,
+          max_players: config.maxPlayers,
+          active_rounds: config.rounds,
         });
 
         // Navigate to lobby with room data
@@ -120,10 +126,10 @@ export default function ConfigScreen() {
             playerTeam: response.player.team?.toString() || "1",
             timePerTurn: response.room.seconds_per_turn.toString(),
             wordsPerPlayer: response.room.words_per_player.toString(),
-            maxPlayers: config.maxPlayers.toString(),
+            maxPlayers: response.room.max_players.toString(),
             useCategories: response.room.use_categories.toString(),
-            allowPlayerWords: config.allowPlayerWords.toString(),
-            rounds: JSON.stringify(config.rounds),
+            allowPlayerWords: response.room.allow_player_words.toString(),
+            rounds: JSON.stringify(response.room.active_rounds),
           },
         });
       }

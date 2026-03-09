@@ -5,7 +5,7 @@ from .models import Room, Player, GameState, Word, TurnHistory
 class PlayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Player
-        fields = ['id', 'name', 'team', 'is_connected', 'joined_at']
+        fields = ['id', 'name', 'team', 'is_connected', 'joined_at', 'words_submitted']
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -15,7 +15,8 @@ class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ['id', 'code', 'is_active', 'game_started', 'seconds_per_turn',
-                  'words_per_player', 'use_categories', 'players', 'player_count', 'created_at']
+                  'words_per_player', 'use_categories', 'allow_player_words', 'max_players',
+                  'active_rounds', 'game_phase', 'players', 'player_count', 'created_at']
     
     def get_player_count(self, obj):
         return obj.players.count()
