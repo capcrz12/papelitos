@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
 import { gameApi } from "../src/services/api";
@@ -15,7 +16,10 @@ import { useSocket } from "../src/hooks/useSocket";
 
 export default function WordSubmissionScreen() {
   const router = useRouter();
+  const navigation = useNavigation<any>();
   const params = useLocalSearchParams();
+  const allowNavigationRef = useRef(false);
+  const phaseNavigationDoneRef = useRef(false);
 
   const roomCode = (params.roomCode as string) || "";
   const playerId = (params.playerId as string) || "";
@@ -39,6 +43,25 @@ export default function WordSubmissionScreen() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [statusText, setStatusText] = useState("Esperando envios...");
+
+  const navigateToGame = () => {
+    if (phaseNavigationDoneRef.current) return;
+    phaseNavigationDoneRef.current = true;
+    allowNavigationRef.current = true;
+
+    router.replace({
+      pathname: "/game",
+      params: {
+        roomCode,
+        playerId,
+        playerName,
+        isHost: isHost ? "true" : "false",
+        timePerTurn: String(timePerTurn),
+        wordsPerPlayer: String(wordsPerPlayer),
+        rounds: roundsParam,
+      },
+    });
+  };
 
   const cleanWords = useMemo(
     () => words.map((w) => w.trim()).filter(Boolean),
@@ -65,18 +88,7 @@ export default function WordSubmissionScreen() {
         );
 
         if (status.phase === "playing" || status.all_submitted) {
-          router.replace({
-            pathname: "/game",
-            params: {
-              roomCode,
-              playerId,
-              playerName,
-              isHost: isHost ? "true" : "false",
-              timePerTurn: String(timePerTurn),
-              wordsPerPlayer: String(wordsPerPlayer),
-              rounds: roundsParam,
-            },
-          });
+          navigateToGame();
         }
       } catch (err: any) {
         const backendError =
@@ -95,18 +107,7 @@ export default function WordSubmissionScreen() {
     };
 
     const handleWordsCompleted = () => {
-      router.replace({
-        pathname: "/game",
-        params: {
-          roomCode,
-          playerId,
-          playerName,
-          isHost: isHost ? "true" : "false",
-          timePerTurn: String(timePerTurn),
-          wordsPerPlayer: String(wordsPerPlayer),
-          rounds: roundsParam,
-        },
-      });
+      navigateToGame();
     };
 
     on("word_submission_progress", handleProgress);
@@ -130,6 +131,33 @@ export default function WordSubmissionScreen() {
     timePerTurn,
     wordsPerPlayer,
   ]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+      if (allowNavigationRef.current) {
+        return;
+      }
+
+      e.preventDefault();
+      Alert.alert(
+        "Salir de la partida",
+        "Si sales ahora dejaras la partida en curso. ¿Seguro que quieres salir?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Salir",
+            style: "destructive",
+            onPress: () => {
+              allowNavigationRef.current = true;
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ],
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const updateWord = (index: number, value: string) => {
     setWords((prev) => prev.map((word, i) => (i === index ? value : word)));

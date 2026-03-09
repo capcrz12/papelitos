@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { useGestureDetector } from "../src/hooks/useGestureDetector";
 
 const { height } = Dimensions.get("window");
@@ -27,7 +28,9 @@ const ROUNDS = [
 
 export default function GameScreen() {
   const router = useRouter();
+  const navigation = useNavigation<any>();
   const params = useLocalSearchParams();
+  const allowNavigationRef = useRef(false);
 
   const parseRounds = (value: string | undefined) => {
     if (!value) return [true, true, true, true];
@@ -109,6 +112,33 @@ export default function GameScreen() {
     }
     return () => clearInterval(timer);
   }, [isPlaying, timeLeft]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
+      if (allowNavigationRef.current) {
+        return;
+      }
+
+      e.preventDefault();
+      Alert.alert(
+        "Salir de la partida",
+        "Si sales ahora perderas el progreso de esta partida. ¿Seguro que quieres salir?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Salir",
+            style: "destructive",
+            onPress: () => {
+              allowNavigationRef.current = true;
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ],
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const startTurn = () => {
     setIsPlaying(true);
