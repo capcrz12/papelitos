@@ -7,24 +7,37 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Input } from "../src/components/Input";
+import { Button } from "../src/components/Button";
 
 export default function HomeScreen() {
   const [roomCode, setRoomCode] = useState("");
   const [playerName, setPlayerName] = useState("");
+  const [error, setError] = useState("");
   const router = useRouter();
 
   const createRoom = () => {
-    if (playerName.trim()) {
-      // TODO: Call API to create room
-      router.push("/lobby");
+    if (!playerName.trim()) {
+      setError("Por favor ingresa tu nombre");
+      return;
     }
+    setError("");
+    // TODO: Store player name in context or async storage
+    router.push("/config");
   };
 
   const joinRoom = () => {
-    if (playerName.trim() && roomCode.trim()) {
-      // TODO: Call API to join room
-      router.push("/lobby");
+    if (!playerName.trim()) {
+      setError("Por favor ingresa tu nombre");
+      return;
     }
+    if (!roomCode.trim()) {
+      setError("Por favor ingresa el código de sala");
+      return;
+    }
+    setError("");
+    // TODO: Call API to join room
+    router.push("/lobby");
   };
 
   return (
@@ -38,8 +51,12 @@ export default function HomeScreen() {
         <Input
           placeholder="Tu nombre"
           value={playerName}
-          onChangeText={setPlayerName}
+          onChangeText={(text) => {
+            setPlayerName(text);
+            setError("");
+          }}
         />
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
         <Button
           title="Crear Partida"
@@ -152,6 +169,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     color: "#999",
     fontSize: 16,
+  },
+  errorText: {
+    color: "#e74c3c",
+    fontSize: 14,
+    marginBottom: 12,
+    marginTop: -8,
   },
   footer: {
     alignItems: "center",

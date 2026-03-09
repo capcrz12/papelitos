@@ -7,9 +7,9 @@ import {
   Animated,
   Dimensions,
   Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useGestureDetector } from '../src/hooks/useGestureDetector';
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useGestureDetector } from "../src/hooks/useGestureDetector";
 
 const { height } = Dimensions.get("window");
 
@@ -38,44 +38,6 @@ export default function GameScreen() {
 
   const cardAnimation = new Animated.Value(0);
 
-  // Enable gesture detection when playing
-  useGestureDetector({
-    onSwipeUp: wordGuessed,
-    enabled: gesturesEnabled && isPlaying,
-    threshold: 1.2,
-  });
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isPlaying && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      endTurn();
-    setGesturesEnabled(true);
-    Alert.alert(
-      '¡Listos!',
-      'Mueve el móvil hacia arriba cuando acierten una palabra',
-      [{ text: 'OK' }]
-    );
-    }
-    return () => clearInterval(timer);
-  }, [isPlaying, timeLeft]);
-
-  const startTurn = () => {
-    setIsPlaying(true);
-    setGesturesEnabled(false);
-    setTimeLeft(60);
-    setWordsGuessed(0);
-  };
-
-  const endTurn = () => {
-    setIsPlaying(false);
-    // TODO: Send results to server
-    setIsMyTurn(false);
-  };
-
   const wordGuessed = () => {
     // Animate card away
     Animated.timing(cardAnimation, {
@@ -100,6 +62,47 @@ export default function GameScreen() {
       setCurrentWord("Siguiente palabra"); // TODO: Get next word
       cardAnimation.setValue(0);
     });
+  };
+
+  // Alias for button press
+  const wordCorrect = wordGuessed;
+
+  // Enable gesture detection when playing
+  useGestureDetector({
+    onSwipeUp: wordGuessed,
+    enabled: gesturesEnabled && isPlaying,
+    threshold: 1.2,
+  });
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isPlaying && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      endTurn();
+      setGesturesEnabled(true);
+      Alert.alert(
+        "¡Listos!",
+        "Mueve el móvil hacia arriba cuando acierten una palabra",
+        [{ text: "OK" }],
+      );
+    }
+    return () => clearInterval(timer);
+  }, [isPlaying, timeLeft]);
+
+  const startTurn = () => {
+    setIsPlaying(true);
+    setGesturesEnabled(false);
+    setTimeLeft(60);
+    setWordsGuessed(0);
+  };
+
+  const endTurn = () => {
+    setIsPlaying(false);
+    // TODO: Send results to server
+    setIsMyTurn(false);
   };
 
   if (!isMyTurn && !isPlaying) {
@@ -175,15 +178,14 @@ export default function GameScreen() {
 
             <TouchableOpacity
               style={[styles.actionButton, styles.correctButton]}
-            🔼 Mueve el móvil hacia arriba cuando acierten {'\n'}
-           
+              onPress={wordCorrect}
             >
               <Text style={styles.actionButtonText}>✅ ¡Correcto!</Text>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.instructionText}>
-            Desliza arriba cuando acierten o toca "¡Correcto!"
+            🔼 Mueve el móvil hacia arriba cuando acierten o toca "¡Correcto!"
           </Text>
         </>
       )}
