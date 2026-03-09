@@ -11,21 +11,39 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "../src/components/Button";
-import { Input } from "../src/components/Input";
 import { gameApi } from "../src/services/api";
 
 export default function ConfigScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const playerName = (params.playerName as string) || "Jugador";
+  const isEditMode = (params.mode as string) === "edit";
+  const roomCode = (params.roomCode as string) || "";
+  const playerId = (params.playerId as string) || "";
+  const playerTeam = (params.playerTeam as string) || "1";
+  const isHost = (params.isHost as string) || "true";
+
+  const parseBool = (value: string | undefined, fallback = false) => {
+    if (value === undefined) return fallback;
+    return value === "true";
+  };
+
+  const parseRounds = (value: string | undefined) => {
+    if (!value) return [true, true, true, true];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+    } catch {}
+    return [true, true, true, true];
+  };
 
   const [config, setConfig] = useState({
-    timePerTurn: 60,
-    wordsPerPlayer: 3,
-    maxPlayers: 8,
-    useCategories: false,
-    allowPlayerWords: true,
-    rounds: [true, true, true, true], // 4 rounds: Description, One Word, Mime, Sounds
+    timePerTurn: parseInt((params.timePerTurn as string) || "60", 10),
+    wordsPerPlayer: parseInt((params.wordsPerPlayer as string) || "3", 10),
+    maxPlayers: parseInt((params.maxPlayers as string) || "8", 10),
+    useCategories: parseBool(params.useCategories as string, false),
+    allowPlayerWords: parseBool(params.allowPlayerWords as string, true),
+    rounds: parseRounds(params.rounds as string), // 4 rounds: Description, One Word, Mime, Sounds
   });
 
   const [loading, setLoading] = useState(false);
@@ -41,7 +59,7 @@ export default function ConfigScreen() {
     setConfig({ ...config, rounds: newRounds });
   };
 
-  const handleCreateRoom = async () => {
+  const handleSaveConfig = async () => {
     if (loading) return;
 
     setLoading(true);
@@ -55,34 +73,60 @@ export default function ConfigScreen() {
         return;
       }
 
-      // Create room with configuration
-      const response = await gameApi.createRoom(playerName, {
-        seconds_per_turn: config.timePerTurn,
-        words_per_player: config.wordsPerPlayer,
-        use_categories: config.useCategories,
-      });
+      if (isEditMode) {
+        if (!roomCode) {
+          throw new Error("No room code provided for update");
+        }
 
-      console.log("Room created successfully:", response);
-      console.log("Room code:", response.room.code);
-      console.log("Player ID:", response.player.id);
+        const response = await gameApi.updateRoomConfig(roomCode, {
+          seconds_per_turn: config.timePerTurn,
+          words_per_player: config.wordsPerPlayer,
+          use_categories: config.useCategories,
+        });
 
-      // Navigate to lobby with room data
-      router.push({
-        pathname: "/lobby",
-        params: {
-          playerName,
-          isHost: "true",
-          roomCode: response.room.code,
-          playerId: response.player.id.toString(),
-          playerTeam: response.player.team?.toString() || "1",
-          timePerTurn: response.room.seconds_per_turn.toString(),
-          wordsPerPlayer: response.room.words_per_player.toString(),
-          maxPlayers: config.maxPlayers.toString(),
-          useCategories: response.room.use_categories.toString(),
-          allowPlayerWords: config.allowPlayerWords.toString(),
-          rounds: JSON.stringify(config.rounds),
-        },
-      });
+        // Return to the same room with updated settings
+        router.replace({
+          pathname: "/lobby",
+          params: {
+            playerName,
+            isHost,
+            roomCode: response.room.code,
+            playerId,
+            playerTeam,
+            timePerTurn: response.room.seconds_per_turn.toString(),
+            wordsPerPlayer: response.room.words_per_player.toString(),
+            maxPlayers: config.maxPlayers.toString(),
+            useCategories: response.room.use_categories.toString(),
+            allowPlayerWords: config.allowPlayerWords.toString(),
+            rounds: JSON.stringify(config.rounds),
+          },
+        });
+      } else {
+        // Create room with configuration
+        const response = await gameApi.createRoom(playerName, {
+          seconds_per_turn: config.timePerTurn,
+          words_per_player: config.wordsPerPlayer,
+          use_categories: config.useCategories,
+        });
+
+        // Navigate to lobby with room data
+        router.push({
+          pathname: "/lobby",
+          params: {
+            playerName,
+            isHost: "true",
+            roomCode: response.room.code,
+            playerId: response.player.id.toString(),
+            playerTeam: response.player.team?.toString() || "1",
+            timePerTurn: response.room.seconds_per_turn.toString(),
+            wordsPerPlayer: response.room.words_per_player.toString(),
+            maxPlayers: config.maxPlayers.toString(),
+            useCategories: response.room.use_categories.toString(),
+            allowPlayerWords: config.allowPlayerWords.toString(),
+            rounds: JSON.stringify(config.rounds),
+          },
+        });
+      }
     } catch (err: any) {
       console.error("Error creating room:", err);
       setError(
@@ -113,9 +157,13 @@ export default function ConfigScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>
+            ← {isEditMode ? "Cancelar" : "Volver"}
+          </Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Configuración de Partida</Text>
+        <Text style={styles.title}>
+          {isEditMode ? "Editar Configuración" : "Configuración de Partida"}
+        </Text>
       </View>
 
       <ScrollView style={styles.content}>
@@ -270,8 +318,16 @@ export default function ConfigScreen() {
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <Button
-          title={loading ? "Creando sala..." : "Crear Partida"}
-          onPress={handleCreateRoom}
+          title={
+            loading
+              ? isEditMode
+                ? "Guardando..."
+                : "Creando sala..."
+              : isEditMode
+                ? "Guardar Cambios"
+                : "Crear Partida"
+          }
+          onPress={handleSaveConfig}
           variant="primary"
           size="large"
           disabled={loading}

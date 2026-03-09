@@ -10,6 +10,7 @@ interface GameStateUpdate {
   type: string;
   data?: any;
   players?: any[];
+  room?: any;
   player_id?: string;
   team?: number;
 }
@@ -92,6 +93,9 @@ export const useSocket = ({
             break;
           case "team_changed":
             triggerEventHandlers("team_changed", message);
+            break;
+          case "room_config_updated":
+            triggerEventHandlers("room_config_updated", message);
             break;
           case "game_started":
             setGameState(message.data);

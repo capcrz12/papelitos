@@ -67,11 +67,28 @@ export default function LobbyScreen() {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState(playerName);
   const [showConfigModal, setShowConfigModal] = useState(false);
+
+  const parseBool = (value: string | undefined, fallback = false) => {
+    if (value === undefined) return fallback;
+    return value === "true";
+  };
+
+  const parseRounds = (value: string | undefined) => {
+    if (!value) return [true, true, true, true];
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+    } catch {}
+    return [true, true, true, true];
+  };
+
   const [config, setConfig] = useState({
     timePerTurn: parseInt(params.timePerTurn as string) || 60,
     wordsPerPlayer: parseInt(params.wordsPerPlayer as string) || 3,
     maxPlayers: parseInt(params.maxPlayers as string) || 8,
-    rounds: 4,
+    useCategories: parseBool(params.useCategories as string, false),
+    allowPlayerWords: parseBool(params.allowPlayerWords as string, true),
+    rounds: parseRounds(params.rounds as string),
   });
 
   // WebSocket connection
@@ -148,11 +165,24 @@ export default function LobbyScreen() {
       );
     };
 
+    // Room config updates from host edits
+    const handleRoomConfigUpdated = (data: any) => {
+      const room = data?.room;
+      if (!room) return;
+      setConfig((prev) => ({
+        ...prev,
+        timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
+        wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
+        useCategories: room.use_categories ?? prev.useCategories,
+      }));
+    };
+
     on("room_not_found", handleRoomNotFound);
     on("player_update", handlePlayerUpdate);
     on("player_joined", handlePlayerJoined);
     on("player_left", handlePlayerLeft);
     on("team_changed", handleTeamChanged);
+    on("room_config_updated", handleRoomConfigUpdated);
 
     return () => {
       off("room_not_found", handleRoomNotFound);
@@ -160,6 +190,7 @@ export default function LobbyScreen() {
       off("player_joined", handlePlayerJoined);
       off("player_left", handlePlayerLeft);
       off("team_changed", handleTeamChanged);
+      off("room_config_updated", handleRoomConfigUpdated);
     };
   }, [on, off, playerId, router]);
 
@@ -186,9 +217,13 @@ export default function LobbyScreen() {
       .then(() => {
         router.push("/game");
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.error("Error starting game:", err);
-        Alert.alert("Error", "No se pudo iniciar la partida");
+        const backendError = err?.response?.data?.error;
+        Alert.alert(
+          "No se pudo iniciar",
+          backendError || "No se pudo iniciar la partida",
+        );
       });
   };
 
@@ -224,42 +259,6 @@ export default function LobbyScreen() {
       );
       setEditingName(false);
     }
-  };
-
-  // TEMPORARY: Simulate a player joining (for testing until WebSocket is implemented)
-  const simulatePlayerJoin = () => {
-    const names = [
-      "Ana",
-      "Luis",
-      "María",
-      "Pedro",
-      "Laura",
-      "Diego",
-      "Sofia",
-      "Miguel",
-    ];
-    const availableNames = names.filter(
-      (name) => !players.some((p) => p.name === name),
-    );
-
-    if (availableNames.length === 0 || players.length >= config.maxPlayers) {
-      Alert.alert(
-        "No se pueden agregar más jugadores",
-        "Se ha alcanzado el máximo de jugadores",
-      );
-      return;
-    }
-
-    const randomName =
-      availableNames[Math.floor(Math.random() * availableNames.length)];
-    const newPlayer: Player = {
-      id: `${players.length + 1}`,
-      name: randomName,
-      team: players.length % 2 === 0 ? 1 : 2,
-      isMe: false,
-    };
-
-    setPlayers([...players, newPlayer]);
   };
 
   return (
@@ -332,14 +331,6 @@ export default function LobbyScreen() {
         {/* Team actions */}
         {isHost && (
           <View style={styles.actionsContainer}>
-            {/* TEMPORARY: Button to simulate player joining */}
-            <Button
-              title="➕ Simular jugador uniéndose (TEST)"
-              onPress={simulatePlayerJoin}
-              variant="secondary"
-              size="medium"
-            />
-            <View style={{ height: 10 }} />
             <Button
               title="🔀 Asignar equipos automáticamente"
               onPress={autoAssignTeams}
@@ -413,7 +404,27 @@ export default function LobbyScreen() {
           <View style={styles.settingsHeader}>
             <Text style={styles.sectionTitle}>⚙️ Configuración</Text>
             {isHost && (
-              <TouchableOpacity onPress={() => router.push("/config")}>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push({
+                    pathname: "/config",
+                    params: {
+                      mode: "edit",
+                      roomCode,
+                      playerName,
+                      playerId,
+                      playerTeam: myPlayer?.team?.toString() || "1",
+                      isHost: "true",
+                      timePerTurn: config.timePerTurn.toString(),
+                      wordsPerPlayer: config.wordsPerPlayer.toString(),
+                      maxPlayers: config.maxPlayers.toString(),
+                      useCategories: config.useCategories.toString(),
+                      allowPlayerWords: config.allowPlayerWords.toString(),
+                      rounds: JSON.stringify(config.rounds),
+                    },
+                  })
+                }
+              >
                 <Text style={styles.editButton}>Editar</Text>
               </TouchableOpacity>
             )}
@@ -432,7 +443,15 @@ export default function LobbyScreen() {
           </View>
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Rondas:</Text>
-            <Text style={styles.settingValue}>{config.rounds}</Text>
+            <Text style={styles.settingValue}>
+              {config.rounds.filter((r) => r).length}
+            </Text>
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Categorías:</Text>
+            <Text style={styles.settingValue}>
+              {config.useCategories ? "Sí" : "No"}
+            </Text>
           </View>
         </View>
       </ScrollView>

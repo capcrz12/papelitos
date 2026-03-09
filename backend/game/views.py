@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from .models import Room, Player, GameState, Word
 from .serializers import RoomSerializer, PlayerSerializer, GameStateSerializer
 
@@ -92,6 +94,38 @@ class RoomViewSet(viewsets.ModelViewSet):
         return Response({
             'message': 'Game started',
             'game_state': GameStateSerializer(game_state).data
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['patch'])
+    def update_config(self, request, code=None):
+        """Update room configuration without changing room code."""
+        room = self.get_object()
+
+        if room.game_started:
+            return Response({'error': 'Cannot update config after game started'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Allow partial updates for current config fields
+        if 'seconds_per_turn' in request.data:
+            room.seconds_per_turn = request.data.get('seconds_per_turn')
+        if 'words_per_player' in request.data:
+            room.words_per_player = request.data.get('words_per_player')
+        if 'use_categories' in request.data:
+            room.use_categories = request.data.get('use_categories')
+
+        room.save()
+
+        # Notify all clients in room so their lobby config updates in real time
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'room_config_updated',
+                'room': RoomSerializer(room).data,
+            }
+        )
+
+        return Response({
+            'room': RoomSerializer(room).data
         }, status=status.HTTP_200_OK)
 
 

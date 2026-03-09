@@ -77,6 +77,18 @@ export const gameApi = {
     return response.data;
   },
 
+  updateRoomConfig: async (
+    roomCode: string,
+    config: RoomConfig,
+  ): Promise<{ room: Room }> => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.patch(
+      `/game/rooms/${safeCode}/update_config/`,
+      config,
+    );
+    return response.data;
+  },
+
   // Categories and words
   getCategories: async (): Promise<Category[]> => {
     const response = await api.get("/words/categories/");

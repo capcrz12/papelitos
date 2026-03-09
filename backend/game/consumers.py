@@ -181,6 +181,12 @@ class GameConsumer(AsyncWebsocketConsumer):
             'team': event['team'],
             'players': event['players']
         }))
+
+    async def room_config_updated(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'room_config_updated',
+            'room': event['room']
+        }))
     
     # Database queries
     @database_sync_to_async
