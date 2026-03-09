@@ -95,9 +95,7 @@ export default function ConfigScreen() {
                   styles.optionButton,
                   config.wordsPerPlayer === words && styles.optionButtonActive,
                 ]}
-                onPress={() =>
-                  setConfig({ ...config, wordsPerPlayer: words })
-                }
+                onPress={() => setConfig({ ...config, wordsPerPlayer: words })}
               >
                 <Text
                   style={[
@@ -157,7 +155,7 @@ export default function ConfigScreen() {
         {/* Word source */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📚 Origen de las palabras</Text>
-          
+
           <View style={styles.switchRow}>
             <View>
               <Text style={styles.switchLabel}>Categorías predefinidas</Text>
@@ -177,7 +175,9 @@ export default function ConfigScreen() {
 
           <View style={styles.switchRow}>
             <View>
-              <Text style={styles.switchLabel}>Los jugadores crean palabras</Text>
+              <Text style={styles.switchLabel}>
+                Los jugadores crean palabras
+              </Text>
               <Text style={styles.switchDescription}>
                 Cada jugador añade sus propias palabras
               </Text>
@@ -197,10 +197,10 @@ export default function ConfigScreen() {
         <View style={styles.summarySection}>
           <Text style={styles.summaryTitle}>📋 Resumen</Text>
           <Text style={styles.summaryText}>
-            • Turnos de {config.timePerTurn} segundos{"\n"}
-            • {config.wordsPerPlayer} palabras por jugador{"\n"}
-            • Hasta {config.maxPlayers} jugadores{"\n"}
-            • {config.rounds.filter((r) => r).length} rondas activas
+            • Turnos de {config.timePerTurn} segundos{"\n"}•{" "}
+            {config.wordsPerPlayer} palabras por jugador{"\n"}• Hasta{" "}
+            {config.maxPlayers} jugadores{"\n"}•{" "}
+            {config.rounds.filter((r) => r).length} rondas activas
           </Text>
         </View>
       </ScrollView>

@@ -20,17 +20,12 @@ interface Player {
   isMe?: boolean;
 }
 
-// Mock data for now
-const mockPlayers: Player[] = [
-  { id: "1", name: "Carlos", team: 1, isMe: true },
-  { id: "2", name: "Ana", team: 1 },
-  { id: "3", name: "Luis", team: 2 },
-  { id: "4", name: "María", team: 2 },
-];
-
 export default function LobbyScreen() {
   const [roomCode, setRoomCode] = useState("ABCD");
-  const [players, setPlayers] = useState<Player[]>(mockPlayers);
+  // Initialize with only the current player
+  const [players, setPlayers] = useState<Player[]>([
+    { id: "1", name: "Carlos", team: 1, isMe: true },
+  ]);
   const [isHost, setIsHost] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("Carlos");
@@ -43,11 +38,20 @@ export default function LobbyScreen() {
   });
   const router = useRouter();
 
+  // TODO: Listen to WebSocket for new players joining
+  useEffect(() => {
+    // Placeholder for WebSocket connection
+    // When a player joins, add them to the players array
+  }, []);
+
   const myPlayer = players.find((p) => p.isMe);
 
   const startGame = () => {
     if (players.length < 4) {
-      Alert.alert("Error", "Se necesitan al menos 4 jugadores para comenzar");
+      Alert.alert(
+        "Jugadores insuficientes",
+        `Se necesitan al menos 4 jugadores para comenzar. Actualmente hay ${players.length}.`,
+      );
       return;
     }
     const team1 = players.filter((p) => p.team === 1).length;
@@ -61,7 +65,7 @@ export default function LobbyScreen() {
 
   const changeTeam = (playerId: string, newTeam: number) => {
     setPlayers(
-      players.map((p) => (p.id === playerId ? { ...p, team: newTeam } : p))
+      players.map((p) => (p.id === playerId ? { ...p, team: newTeam } : p)),
     );
   };
 
@@ -72,16 +76,55 @@ export default function LobbyScreen() {
       team: (index % 2) + 1,
     }));
     setPlayers(updated);
-    Alert.alert("Equipos asignados", "Los jugadores se han distribuido aleatoriamente");
+    Alert.alert(
+      "Equipos asignados",
+      "Los jugadores se han distribuido aleatoriamente",
+    );
   };
 
   const saveName = () => {
     if (newName.trim()) {
       setPlayers(
-        players.map((p) => (p.isMe ? { ...p, name: newName.trim() } : p))
+        players.map((p) => (p.isMe ? { ...p, name: newName.trim() } : p)),
       );
       setEditingName(false);
     }
+  };
+
+  // TEMPORARY: Simulate a player joining (for testing until WebSocket is implemented)
+  const simulatePlayerJoin = () => {
+    const names = [
+      "Ana",
+      "Luis",
+      "María",
+      "Pedro",
+      "Laura",
+      "Diego",
+      "Sofia",
+      "Miguel",
+    ];
+    const availableNames = names.filter(
+      (name) => !players.some((p) => p.name === name),
+    );
+
+    if (availableNames.length === 0 || players.length >= config.maxPlayers) {
+      Alert.alert(
+        "No se pueden agregar más jugadores",
+        "Se ha alcanzado el máximo de jugadores",
+      );
+      return;
+    }
+
+    const randomName =
+      availableNames[Math.floor(Math.random() * availableNames.length)];
+    const newPlayer: Player = {
+      id: `${players.length + 1}`,
+      name: randomName,
+      team: players.length % 2 === 0 ? 1 : 2,
+      isMe: false,
+    };
+
+    setPlayers([...players, newPlayer]);
   };
 
   return (
@@ -128,9 +171,29 @@ export default function LobbyScreen() {
       </View>
 
       <ScrollView style={styles.playersContainer}>
+        {/* Waiting for players message */}
+        {players.length < 4 && (
+          <View style={styles.waitingForPlayersCard}>
+            <Text style={styles.waitingForPlayersTitle}>
+              ⏳ Esperando jugadores...
+            </Text>
+            <Text style={styles.waitingForPlayersText}>
+              Faltan {4 - players.length} jugadores para comenzar (mínimo 4)
+            </Text>
+          </View>
+        )}
+
         {/* Team actions */}
         {isHost && (
           <View style={styles.actionsContainer}>
+            {/* TEMPORARY: Button to simulate player joining */}
+            <Button
+              title="➕ Simular jugador uniéndose (TEST)"
+              onPress={simulatePlayerJoin}
+              variant="secondary"
+              size="medium"
+            />
+            <View style={{ height: 10 }} />
             <Button
               title="🔀 Asignar equipos automáticamente"
               onPress={autoAssignTeams}
@@ -329,6 +392,24 @@ const styles = StyleSheet.create({
   playersContainer: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  waitingForPlayersCard: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#fbbf24",
+  },
+  waitingForPlayersTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#92400e",
+    marginBottom: 4,
+  },
+  waitingForPlayersText: {
+    fontSize: 14,
+    color: "#92400e",
   },
   actionsContainer: {
     marginBottom: 16,
