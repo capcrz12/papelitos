@@ -11,7 +11,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
-import { gameApi } from "../src/services/api";
+import { gameApi, WS_BASE_URL } from "../src/services/api";
 import { useSocket } from "../src/hooks/useSocket";
 
 export default function WordSubmissionScreen() {
@@ -29,7 +29,7 @@ export default function WordSubmissionScreen() {
   const timePerTurn = parseInt((params.timePerTurn as string) || "60", 10);
   const roundsParam = (params.rounds as string) || "[true,true,true,true]";
 
-  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || "http://localhost:8000";
+  const wsUrl = WS_BASE_URL;
   const { on, off } = useSocket({
     url: wsUrl,
     roomCode,

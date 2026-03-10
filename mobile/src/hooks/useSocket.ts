@@ -10,6 +10,7 @@ interface UseSocketProps {
 interface GameStateUpdate {
   type: string;
   data?: any;
+  game_state?: any;
   players?: any[];
   room?: any;
   reason?: string;
@@ -98,7 +99,9 @@ export const useSocket = ({
     };
 
     ws.onerror = (error) => {
-      console.error(`${wsLogPrefix} error:`, error);
+      // React Native shows a redbox for console.error. This event can be
+      // transient when the socket reconnects, so keep it as a warning.
+      console.warn(`${wsLogPrefix} error:`, error);
     };
 
     ws.onmessage = (event) => {
@@ -144,12 +147,16 @@ export const useSocket = ({
             triggerEventHandlers("words_phase_completed", message);
             break;
           case "word_update":
-            setGameState((prev: any) => ({ ...prev, ...message.data }));
-            triggerEventHandlers("word_update", message.data);
+            setGameState((prev: any) => ({ ...prev, ...message.game_state }));
+            triggerEventHandlers("word_update", message.game_state);
             break;
           case "turn_ended":
-            setGameState((prev: any) => ({ ...prev, ...message.data }));
-            triggerEventHandlers("turn_ended", message.data);
+            setGameState((prev: any) => ({ ...prev, ...message.game_state }));
+            triggerEventHandlers("turn_ended", message.game_state);
+            break;
+          case "turn_started":
+            setGameState((prev: any) => ({ ...prev, ...message.game_state }));
+            triggerEventHandlers("turn_started", message.game_state);
             break;
           default:
             console.log(`${wsLogPrefix} unknown message type:`, message.type);

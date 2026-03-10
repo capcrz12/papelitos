@@ -185,6 +185,13 @@ class GameConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'words_phase_completed',
             'room': event['room'],
+            'game_state': event.get('game_state'),
+        }))
+
+    async def turn_started(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'turn_started',
+            'game_state': event['game_state'],
         }))
     
     async def word_update(self, event):
@@ -240,10 +247,19 @@ class GameConsumer(AsyncWebsocketConsumer):
             game_state = room.game_state
             return {
                 'current_round': game_state.current_round,
-                'current_player': game_state.current_player.name if game_state.current_player else None,
-                'current_word': game_state.current_word.text if game_state.current_word else None,
+                'current_player': {
+                    'id': game_state.current_player.id,
+                    'name': game_state.current_player.name,
+                    'team': game_state.current_player.team,
+                } if game_state.current_player else None,
+                'current_word': {
+                    'id': game_state.current_word.id,
+                    'text': game_state.current_word.text,
+                } if game_state.current_word else None,
                 'team1_score': game_state.team1_score,
                 'team2_score': game_state.team2_score,
+                'turn_started_at': game_state.turn_started_at.isoformat() if game_state.turn_started_at else None,
+                'turn_ends_at': game_state.turn_ends_at.isoformat() if game_state.turn_ends_at else None,
             }
         except (Room.DoesNotExist, GameState.DoesNotExist):
             return None
@@ -327,9 +343,14 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_state.save()
         
         return {
-            'current_word': game_state.current_word.text if game_state.current_word else None,
+            'current_word': {
+                'id': game_state.current_word.id,
+                'text': game_state.current_word.text,
+            } if game_state.current_word else None,
             'team1_score': game_state.team1_score,
             'team2_score': game_state.team2_score,
+            'turn_started_at': game_state.turn_started_at.isoformat() if game_state.turn_started_at else None,
+            'turn_ends_at': game_state.turn_ends_at.isoformat() if game_state.turn_ends_at else None,
         }
     
     @database_sync_to_async
@@ -342,7 +363,12 @@ class GameConsumer(AsyncWebsocketConsumer):
         game_state.save()
         
         return {
-            'current_word': game_state.current_word.text if game_state.current_word else None,
+            'current_word': {
+                'id': game_state.current_word.id,
+                'text': game_state.current_word.text,
+            } if game_state.current_word else None,
+            'turn_started_at': game_state.turn_started_at.isoformat() if game_state.turn_started_at else None,
+            'turn_ends_at': game_state.turn_ends_at.isoformat() if game_state.turn_ends_at else None,
         }
     
     @database_sync_to_async
@@ -354,11 +380,25 @@ class GameConsumer(AsyncWebsocketConsumer):
         current_team = game_state.current_player.team
         next_team = 1 if current_team == 2 else 2
         
-        next_player = room.players.filter(team=next_team).first()
+        next_player = room.players.filter(team=next_team).order_by('?').first()
+        if not next_player:
+            next_player = room.players.order_by('?').first()
+
         game_state.current_player = next_player
+        game_state.turn_started_at = None
+        game_state.turn_ends_at = None
+        game_state.current_word = None
         game_state.save()
         
         return {
-            'current_player': game_state.current_player.name,
-            'current_player_team': game_state.current_player.team,
+            'current_player': {
+                'id': game_state.current_player.id,
+                'name': game_state.current_player.name,
+                'team': game_state.current_player.team,
+            } if game_state.current_player else None,
+            'current_word': None,
+            'team1_score': game_state.team1_score,
+            'team2_score': game_state.team2_score,
+            'turn_started_at': None,
+            'turn_ends_at': None,
         }

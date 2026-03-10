@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth.models import User
+from django.utils import timezone
+from datetime import timedelta
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Room, Player, GameState, Word
@@ -99,18 +101,27 @@ class RoomViewSet(viewsets.ModelViewSet):
 
         room.players.update(words_submitted=False)
         
-        # Create game state
-        first_player = room.players.filter(team=1).first()
+        # Create game state with random starting player and first enabled round.
+        first_player = room.players.order_by('?').first()
+        active_rounds = room.active_rounds if isinstance(room.active_rounds, list) else []
+        try:
+            first_round = next((index + 1 for index, enabled in enumerate(active_rounds) if enabled), 1)
+        except Exception:
+            first_round = 1
+
         game_state, _ = GameState.objects.get_or_create(
             room=room,
             defaults={
                 'current_player': first_player,
-                'current_round': 1,
+                'current_round': first_round,
             }
         )
 
         game_state.current_player = first_player
-        game_state.current_round = 1
+        game_state.current_round = first_round
+        game_state.turn_started_at = None
+        game_state.turn_ends_at = None
+        game_state.current_word = None
         game_state.save()
 
         room_data = RoomSerializer(room).data
@@ -294,6 +305,18 @@ class RoomViewSet(viewsets.ModelViewSet):
         )
 
         if all_submitted:
+            game_state, _ = GameState.objects.get_or_create(room=room)
+            game_state.current_player = room.players.order_by('?').first()
+            active_rounds = room.active_rounds if isinstance(room.active_rounds, list) else []
+            try:
+                game_state.current_round = next((index + 1 for index, enabled in enumerate(active_rounds) if enabled), 1)
+            except Exception:
+                game_state.current_round = 1
+            game_state.turn_started_at = None
+            game_state.turn_ends_at = None
+            game_state.current_word = None
+            game_state.save()
+
             room.game_phase = 'playing'
             room.save()
             async_to_sync(channel_layer.group_send)(
@@ -301,6 +324,7 @@ class RoomViewSet(viewsets.ModelViewSet):
                 {
                     'type': 'words_phase_completed',
                     'room': RoomSerializer(room).data,
+                    'game_state': GameStateSerializer(game_state).data,
                 }
             )
 
@@ -312,6 +336,48 @@ class RoomViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=['post'])
+    def start_turn(self, request, code=None):
+        """Start the active player's turn and broadcast timer/word to the room."""
+        room = self.get_object()
+        player_id = str(request.data.get('player_id', '')).strip()
+
+        if not room.game_started or room.game_phase != 'playing':
+            return Response({'error': 'Game is not in playing phase'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            game_state = room.game_state
+        except GameState.DoesNotExist:
+            return Response({'error': 'Game state not initialized'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not game_state.current_player:
+            return Response({'error': 'No active player assigned'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if str(game_state.current_player.id) != player_id:
+            return Response({'error': 'Only active player can start turn'}, status=status.HTTP_403_FORBIDDEN)
+
+        next_word = room.words.filter(used_in_current_round=False).order_by('?').first()
+        if not next_word:
+            return Response({'error': 'No words available for this round'}, status=status.HTTP_400_BAD_REQUEST)
+
+        now = timezone.now()
+        game_state.turn_started_at = now
+        game_state.turn_ends_at = now + timedelta(seconds=room.seconds_per_turn)
+        game_state.current_word = next_word
+        game_state.save()
+
+        game_data = GameStateSerializer(game_state).data
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'game_{room.code}',
+            {
+                'type': 'turn_started',
+                'game_state': game_data,
+            }
+        )
+
+        return Response({'game_state': game_data}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'])
     def words_submission_status(self, request, code=None):

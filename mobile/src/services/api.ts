@@ -1,7 +1,11 @@
 import axios from "axios";
+import { resolveApiBaseUrl, resolveWsBaseUrl } from "./network";
 
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000/api";
+export const API_BASE_URL = resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_URL);
+export const WS_BASE_URL = resolveWsBaseUrl(
+  process.env.EXPO_PUBLIC_WS_URL,
+  API_BASE_URL,
+);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -95,6 +99,14 @@ export const gameApi = {
   startGameAsHost: async (roomCode: string, playerId: string) => {
     const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
     const response = await api.post(`/game/rooms/${safeCode}/start_game/`, {
+      player_id: playerId,
+    });
+    return response.data;
+  },
+
+  startTurn: async (roomCode: string, playerId: string) => {
+    const safeCode = encodeURIComponent(roomCode.trim().toUpperCase());
+    const response = await api.post(`/game/rooms/${safeCode}/start_turn/`, {
       player_id: playerId,
     });
     return response.data;

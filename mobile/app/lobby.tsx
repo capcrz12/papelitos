@@ -12,7 +12,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Button } from "../src/components/Button";
 import { Input } from "../src/components/Input";
 import { useSocket } from "../src/hooks/useSocket";
-import { gameApi } from "../src/services/api";
+import { gameApi, WS_BASE_URL } from "../src/services/api";
 
 interface Player {
   id: string;
@@ -109,8 +109,8 @@ export default function LobbyScreen() {
     timePerTurn: parseInt(params.timePerTurn as string) || 60,
     wordsPerPlayer: parseInt(params.wordsPerPlayer as string) || 3,
     maxPlayers: parseInt(params.maxPlayers as string) || 8,
-    useCategories: parseBool(params.useCategories as string, false),
-    allowPlayerWords: parseBool(params.allowPlayerWords as string, true),
+    useCategories: false,
+    allowPlayerWords: true,
     rounds: parseRounds(params.rounds as string),
   });
   const configRef = useRef(config);
@@ -120,7 +120,7 @@ export default function LobbyScreen() {
   }, [config]);
 
   // WebSocket connection
-  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || "http://localhost:8000";
+  const wsUrl = WS_BASE_URL;
   const { socket, isConnected, emit, on, off } = useSocket({
     url: wsUrl,
     roomCode: roomCode,
@@ -223,8 +223,8 @@ export default function LobbyScreen() {
         timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
         wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
         maxPlayers: room.max_players ?? prev.maxPlayers,
-        useCategories: room.use_categories ?? prev.useCategories,
-        allowPlayerWords: room.allow_player_words ?? prev.allowPlayerWords,
+        useCategories: false,
+        allowPlayerWords: true,
         rounds:
           Array.isArray(room.active_rounds) && room.active_rounds.length === 4
             ? room.active_rounds
@@ -259,9 +259,7 @@ export default function LobbyScreen() {
           wordsPerPlayer: String(
             roomData?.words_per_player ?? currentConfig.wordsPerPlayer,
           ),
-          allowPlayerWords: String(
-            roomData?.allow_player_words ?? currentConfig.allowPlayerWords,
-          ),
+          allowPlayerWords: String(true),
           rounds: JSON.stringify(
             roomData?.active_rounds ?? currentConfig.rounds,
           ),
@@ -279,8 +277,8 @@ export default function LobbyScreen() {
           timePerTurn: room.seconds_per_turn ?? prev.timePerTurn,
           wordsPerPlayer: room.words_per_player ?? prev.wordsPerPlayer,
           maxPlayers: room.max_players ?? prev.maxPlayers,
-          useCategories: room.use_categories ?? prev.useCategories,
-          allowPlayerWords: room.allow_player_words ?? prev.allowPlayerWords,
+          useCategories: false,
+          allowPlayerWords: true,
           rounds:
             Array.isArray(room.active_rounds) && room.active_rounds.length === 4
               ? room.active_rounds
@@ -711,16 +709,8 @@ export default function LobbyScreen() {
             </Text>
           </View>
           <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Categorías:</Text>
-            <Text style={styles.settingValue}>
-              {config.useCategories ? "Sí" : "No"}
-            </Text>
-          </View>
-          <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Jugadores crean palabras:</Text>
-            <Text style={styles.settingValue}>
-              {config.allowPlayerWords ? "Sí" : "No"}
-            </Text>
+            <Text style={styles.settingValue}>Sí (fijo)</Text>
           </View>
         </View>
       </ScrollView>

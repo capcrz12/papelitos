@@ -41,8 +41,8 @@ export default function ConfigScreen() {
     timePerTurn: parseInt((params.timePerTurn as string) || "60", 10),
     wordsPerPlayer: parseInt((params.wordsPerPlayer as string) || "3", 10),
     maxPlayers: parseInt((params.maxPlayers as string) || "8", 10),
-    useCategories: parseBool(params.useCategories as string, false),
-    allowPlayerWords: parseBool(params.allowPlayerWords as string, true),
+    useCategories: false,
+    allowPlayerWords: true,
     rounds: parseRounds(params.rounds as string), // 4 rounds: Description, One Word, Mime, Sounds
   });
 
@@ -81,8 +81,8 @@ export default function ConfigScreen() {
         const response = await gameApi.updateRoomConfig(roomCode, {
           seconds_per_turn: config.timePerTurn,
           words_per_player: config.wordsPerPlayer,
-          use_categories: config.useCategories,
-          allow_player_words: config.allowPlayerWords,
+          use_categories: false,
+          allow_player_words: true,
           max_players: config.maxPlayers,
           active_rounds: config.rounds,
         });
@@ -99,8 +99,8 @@ export default function ConfigScreen() {
             timePerTurn: response.room.seconds_per_turn.toString(),
             wordsPerPlayer: response.room.words_per_player.toString(),
             maxPlayers: response.room.max_players.toString(),
-            useCategories: response.room.use_categories.toString(),
-            allowPlayerWords: response.room.allow_player_words.toString(),
+            useCategories: "false",
+            allowPlayerWords: "true",
             rounds: JSON.stringify(response.room.active_rounds),
           },
         });
@@ -109,8 +109,8 @@ export default function ConfigScreen() {
         const response = await gameApi.createRoom(playerName, {
           seconds_per_turn: config.timePerTurn,
           words_per_player: config.wordsPerPlayer,
-          use_categories: config.useCategories,
-          allow_player_words: config.allowPlayerWords,
+          use_categories: false,
+          allow_player_words: true,
           max_players: config.maxPlayers,
           active_rounds: config.rounds,
         });
@@ -127,8 +127,8 @@ export default function ConfigScreen() {
             timePerTurn: response.room.seconds_per_turn.toString(),
             wordsPerPlayer: response.room.words_per_player.toString(),
             maxPlayers: response.room.max_players.toString(),
-            useCategories: response.room.use_categories.toString(),
-            allowPlayerWords: response.room.allow_player_words.toString(),
+            useCategories: "false",
+            allowPlayerWords: "true",
             rounds: JSON.stringify(response.room.active_rounds),
           },
         });
@@ -270,41 +270,16 @@ export default function ConfigScreen() {
         {/* Word source */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📚 Origen de las palabras</Text>
-
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.switchLabel}>Categorías predefinidas</Text>
-              <Text style={styles.switchDescription}>
-                Animales, películas, países, etc.
-              </Text>
-            </View>
-            <Switch
-              value={config.useCategories}
-              onValueChange={(value) =>
-                setConfig({ ...config, useCategories: value })
-              }
-              trackColor={{ false: "#d1d5db", true: "#4ade80" }}
-              thumbColor={config.useCategories ? "#22c55e" : "#f3f4f6"}
-            />
-          </View>
-
           <View style={styles.switchRow}>
             <View>
               <Text style={styles.switchLabel}>
                 Los jugadores crean palabras
               </Text>
               <Text style={styles.switchDescription}>
-                Cada jugador añade sus propias palabras
+                Opción fija: cada jugador añade sus propias palabras
               </Text>
             </View>
-            <Switch
-              value={config.allowPlayerWords}
-              onValueChange={(value) =>
-                setConfig({ ...config, allowPlayerWords: value })
-              }
-              trackColor={{ false: "#d1d5db", true: "#4ade80" }}
-              thumbColor={config.allowPlayerWords ? "#22c55e" : "#f3f4f6"}
-            />
+            <Text style={styles.fixedValue}>Siempre</Text>
           </View>
         </View>
 
@@ -433,6 +408,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6b7280",
     marginTop: 2,
+  },
+  fixedValue: {
+    fontSize: 14,
+    color: "#16a34a",
+    fontWeight: "700",
   },
   summarySection: {
     backgroundColor: "#f0fdf4",
