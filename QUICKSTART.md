@@ -1,142 +1,46 @@
-# 🚀 Inicio Rápido - Papelitos (WordWave)
+﻿# Quickstart
 
-## ✅ Estado del Proyecto
+## 1. Instalar dependencias
 
-El proyecto está completamente configurado y listo para usar:
-
-- ✅ Dependencias instaladas (mobile y backend)
-- ✅ Base de datos configurada con migraciones aplicadas
-- ✅ Datos iniciales cargados (8 categorías, 150+ palabras)
-- ✅ Superusuario creado: `admin` / `admin123`
-- ✅ Servidores iniciados
-
-## 🎮 Ejecutar la Aplicación
-
-### Backend (Django) - Terminal 1
-
-```powershell
-cd backend
-.\venv\Scripts\Activate.ps1
-python manage.py runserver
-```
-
-El servidor estará disponible en: http://localhost:8000
-Admin panel: http://localhost:8000/admin
-
-### Mobile (Expo) - Terminal 2
-
-**MÉTODO 1: Usando el script (RECOMENDADO)**
-
-```powershell
+```bash
 cd mobile
-# Doble clic en EJECUTAR_EXPO.bat
-# O ejecuta:
-.\iniciar-expo.ps1
+npm install
 ```
 
-**MÉTODO 2: Manual**
+## 2. Iniciar
 
-```powershell
-cd mobile
-$env:REACT_NATIVE_PACKAGER_HOSTNAME='192.168.1.194'  # Cambia por tu IP
-npx expo start --lan
+```bash
+npx expo start
 ```
 
-Luego:
+## 3. Abrir la app
 
-- Abre **Expo Go** en tu teléfono (misma red WiFi)
-- Toca **"Enter URL manually"**
-- Ingresa: `exp://192.168.1.194:8081` (usa tu IP)
-- O escanea el QR que aparece en la terminal
+- Web: tecla `w`
+- Android: tecla `a`
+- iOS: tecla `i`
+- Telefono: escanea el QR con Expo Go
 
-## 📱 Probar la Aplicación
+## 4. Jugar
 
-1. **Crear una sala**: En la pantalla principal, toca "Crear Sala"
-2. **Unirse a una sala**: Ingresa el código de 4 letras y toca "Unirse"
-3. **Lobby**: Espera a que otros jugadores se unan
-4. **Jugar**: El anfitrión inicia el juego y comienza la diversión
+1. Toca "Crear partida".
+2. Configura la partida.
+3. Agrega jugadores y equipos.
+4. Carga palabras por jugador.
+5. Juega por turnos.
 
-## 🗄️ Administración
+## Problemas comunes
 
-Accede al panel de administración de Django:
+### No abre en telefono
 
-- URL: http://localhost:8000/admin
-- Usuario: `admin`
-- Contraseña: `admin123`
+- Verifica que PC y telefono esten en la misma red.
+- Reinicia Expo con cache limpio:
 
-Aquí puedes:
-
-- Ver y editar salas activas
-- Gestionar categorías y palabras
-- Ver historial de turnos
-
-## 🐛 Solución de Problemas
-
-### ⚠️ Error al escanear QR - Versiones Incompatibles
-
-Si al escanear el QR obtienes un error y ves este warning:
-
-```
-The following packages should be updated for best compatibility...
-expo-sensors@13.0.9 - expected version: ~12.9.1
-react-native@0.73.4 - expected version: 0.73.6
-```
-
-**Solución:**
-
-```powershell
-cd mobile
-npx expo install --fix
+```bash
 npx expo start --clear
 ```
 
-Esto corrige automáticamente las versiones y reinicia con caché limpio.
+### Error de dependencias
 
-### El backend no inicia
-
-```powershell
-cd backend
-.\venv\Scripts\Activate.ps1
-python manage.py migrate
-```
-
-### La app móvil muestra errores generales
-
-```powershell
-cd mobile
+```bash
 npm install
-npx expo start -c  # -c limpia el caché
 ```
-
-### Puerto 8081 ocupado
-
-Si ves "Port 8081 is being used", escribe `y` para usar otro puerto o:
-
-```powershell
-# Matar proceso en puerto 8081
-Get-NetTCPConnection -LocalPort 8081 | Select-Object -ExpandProperty OwningProcess -First 1 | ForEach-Object { Stop-Process -Id $_ -Force }
-```
-
-## 📝 Credenciales
-
-- **Admin Django**: admin / admin123
-- **Backend URL**: http://localhost:8000
-- **WebSocket URL**: ws://localhost:8000/ws/game/
-
-## 🌐 URLs Importantes
-
-- API Docs: http://localhost:8000/api/
-- Admin Panel: http://localhost:8000/admin
-- Categorías: http://localhost:8000/api/categories/
-- Crear Sala: POST http://localhost:8000/api/rooms/create/
-
-## ⚡ Próximos Pasos
-
-1. **Conectar Frontend al Backend**: Actualizar `mobile/src/services/api.ts` con la URL real
-2. **Probar WebSockets**: Verificar conexión en tiempo real
-3. **Implementar Autenticación**: Reemplazar mock auth con JWT real
-4. **Deploy**: Seguir instrucciones en `DEPLOYMENT.md`
-
----
-
-¡Todo está listo! Ambos servidores deberían estar ejecutándose en este momento. 🎉

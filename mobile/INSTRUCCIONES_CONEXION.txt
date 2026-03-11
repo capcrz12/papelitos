@@ -62,7 +62,6 @@ OPCIÓN B - Manual:
 
 • Interfaz web Metro: http://localhost:8081
 • URL para Expo Go: exp://192.168.1.194:8081
-• Backend Django: http://localhost:8000
 
 ═══════════════════════════════════════════════════════
   🆘 PROBLEMAS COMUNES

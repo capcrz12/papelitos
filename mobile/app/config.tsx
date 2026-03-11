@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,13 @@ import {
   Switch,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Input } from "../src/components/Input";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button } from "../src/components/Button";
-
-type Team = 1 | 2;
 
 interface PlayerConfig {
   id: string;
   name: string;
-  team: Team;
+  team: 1 | 2;
 }
 
 interface GameSetup {
@@ -36,20 +33,56 @@ const roundNames = [
 
 export default function ConfigScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
-  const [timePerTurn, setTimePerTurn] = useState(60);
-  const [wordsPerPlayer, setWordsPerPlayer] = useState(3);
-  const [rounds, setRounds] = useState<boolean[]>([true, true, true, true]);
+  const players = useMemo<PlayerConfig[]>(() => {
+    const raw = params.players as string | undefined;
+    if (!raw) return [];
 
-  const [players, setPlayers] = useState<PlayerConfig[]>([]);
-  const [newPlayerName, setNewPlayerName] = useState("");
-  const [newPlayerTeam, setNewPlayerTeam] = useState<Team>(1);
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [params.players]);
+
+  const currentSettings = useMemo(() => {
+    const raw = params.settings as string | undefined;
+    if (!raw) {
+      return {
+        timePerTurn: 30,
+        wordsPerPlayer: 3,
+        rounds: [true, true, true, true] as boolean[],
+      };
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        timePerTurn: Number(parsed.timePerTurn) || 30,
+        wordsPerPlayer: Number(parsed.wordsPerPlayer) || 3,
+        rounds:
+          Array.isArray(parsed.rounds) && parsed.rounds.length === 4
+            ? parsed.rounds
+            : [true, true, true, true],
+      };
+    } catch {
+      return {
+        timePerTurn: 30,
+        wordsPerPlayer: 3,
+        rounds: [true, true, true, true] as boolean[],
+      };
+    }
+  }, [params.settings]);
+
+  const [timePerTurn, setTimePerTurn] = useState(currentSettings.timePerTurn);
+  const [wordsPerPlayer, setWordsPerPlayer] = useState(
+    currentSettings.wordsPerPlayer,
+  );
+  const [rounds, setRounds] = useState<boolean[]>(currentSettings.rounds);
 
   const timeOptions = [30, 45, 60, 90, 120];
   const wordsOptions = [2, 3, 4, 5, 6];
-
-  const teamOneCount = players.filter((player) => player.team === 1).length;
-  const teamTwoCount = players.filter((player) => player.team === 2).length;
 
   const toggleRound = (index: number) => {
     setRounds((prev) => {
@@ -59,62 +92,21 @@ export default function ConfigScreen() {
     });
   };
 
-  const addPlayer = () => {
-    const name = newPlayerName.trim();
-    if (!name) {
-      Alert.alert("Nombre requerido", "Escribe el nombre del jugador.");
-      return;
-    }
-
-    setPlayers((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
-        name,
-        team: newPlayerTeam,
-      },
-    ]);
-
-    setNewPlayerName("");
-  };
-
-  const removePlayer = (id: string) => {
-    setPlayers((prev) => prev.filter((player) => player.id !== id));
-  };
-
-  const startWordSubmission = () => {
+  const saveConfig = () => {
     if (!rounds.some(Boolean)) {
       Alert.alert("Configuracion incompleta", "Activa al menos una ronda.");
       return;
     }
 
-    if (players.length < 2) {
-      Alert.alert(
-        "Jugadores insuficientes",
-        "Necesitas al menos 2 jugadores para empezar.",
-      );
-      return;
-    }
-
-    if (teamOneCount === 0 || teamTwoCount === 0) {
-      Alert.alert(
-        "Equipos incompletos",
-        "Debe haber al menos un jugador en cada equipo.",
-      );
-      return;
-    }
-
-    const setup: GameSetup = {
-      timePerTurn,
-      wordsPerPlayer,
-      rounds,
-      players,
-    };
-
-    router.push({
-      pathname: "/word-submission",
+    router.replace({
+      pathname: "/teams",
       params: {
-        setup: JSON.stringify(setup),
+        players: JSON.stringify(players),
+        settings: JSON.stringify({
+          timePerTurn,
+          wordsPerPlayer,
+          rounds,
+        }),
       },
     });
   };
@@ -123,7 +115,7 @@ export default function ConfigScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Configurar partida</Text>
-        <Text style={styles.subtitle}>Todo se juega en este dispositivo</Text>
+        <Text style={styles.subtitle}>Ajustes rapidos</Text>
       </View>
 
       <ScrollView style={styles.content}>
@@ -191,68 +183,23 @@ export default function ConfigScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Jugadores y equipos</Text>
-
-          <Input
-            placeholder="Nombre del jugador"
-            value={newPlayerName}
-            onChangeText={setNewPlayerName}
-          />
-
-          <View style={styles.teamSelectRow}>
-            <TouchableOpacity
-              style={[
-                styles.teamButton,
-                newPlayerTeam === 1 && styles.teamButtonBlue,
-              ]}
-              onPress={() => setNewPlayerTeam(1)}
-            >
-              <Text style={styles.teamButtonText}>Equipo 1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.teamButton,
-                newPlayerTeam === 2 && styles.teamButtonRed,
-              ]}
-              onPress={() => setNewPlayerTeam(2)}
-            >
-              <Text style={styles.teamButtonText}>Equipo 2</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Button
-            title="Agregar jugador"
-            onPress={addPlayer}
-            variant="secondary"
-            size="medium"
-          />
-
-          <View style={styles.playersList}>
-            {players.map((player) => (
-              <View key={player.id} style={styles.playerRow}>
-                <Text style={styles.playerText}>
-                  {player.name} - Equipo {player.team}
-                </Text>
-                <TouchableOpacity onPress={() => removePlayer(player.id)}>
-                  <Text style={styles.removeText}>Quitar</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-            {players.length === 0 && (
-              <Text style={styles.emptyText}>Todavia no hay jugadores.</Text>
-            )}
-          </View>
-
+          <Text style={styles.sectionTitle}>Resumen</Text>
           <Text style={styles.summaryText}>
-            Equipo 1: {teamOneCount} | Equipo 2: {teamTwoCount}
+            Rondas activas: {rounds.filter(Boolean).length}
+          </Text>
+          <Text style={styles.summaryText}>
+            Tiempo por turno: {timePerTurn}s
+          </Text>
+          <Text style={styles.summaryText}>
+            Palabras por jugador: {wordsPerPlayer}
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <Button
-          title="Continuar a palabras"
-          onPress={startWordSubmission}
+          title="Guardar y volver"
+          onPress={saveConfig}
           variant="primary"
           size="large"
         />
@@ -333,57 +280,9 @@ const styles = StyleSheet.create({
     color: "#374151",
     fontWeight: "600",
   },
-  teamSelectRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 12,
-  },
-  teamButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#ffffff",
-  },
-  teamButtonBlue: {
-    borderColor: "#2563eb",
-    backgroundColor: "#dbeafe",
-  },
-  teamButtonRed: {
-    borderColor: "#dc2626",
-    backgroundColor: "#fee2e2",
-  },
-  teamButtonText: {
-    fontWeight: "700",
-    color: "#1f2937",
-  },
-  playersList: {
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    paddingTop: 10,
-    gap: 8,
-  },
-  playerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  playerText: {
-    color: "#111827",
-  },
-  removeText: {
-    color: "#dc2626",
-    fontWeight: "700",
-  },
-  emptyText: {
-    color: "#6b7280",
-  },
   summaryText: {
-    marginTop: 12,
     color: "#374151",
+    marginBottom: 6,
     fontWeight: "600",
   },
   footer: {

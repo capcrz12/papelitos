@@ -10,22 +10,20 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>WordWave</Text>
-        <Text style={styles.subtitle}>Modo local en un solo dispositivo</Text>
+        <Text style={styles.subtitle}>Juega con amigos</Text>
       </View>
 
       <View style={styles.form}>
         <Button
           title="Crear partida"
-          onPress={() => router.push("/config")}
+          onPress={() => router.push("/teams")}
           variant="primary"
           size="large"
         />
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Sin salas, sin websocket, sin esperas
-        </Text>
+        <Text style={styles.footerText}>Pasa el dispositivo y empieza</Text>
       </View>
     </View>
   );

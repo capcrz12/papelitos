@@ -25,7 +25,7 @@ interface GameSetup {
 }
 
 const defaultSetup: GameSetup = {
-  timePerTurn: 60,
+  timePerTurn: 30,
   wordsPerPlayer: 3,
   rounds: [true, true, true, true],
   players: [],
@@ -45,7 +45,7 @@ export default function WordSubmissionScreen() {
         return defaultSetup;
       }
       return {
-        timePerTurn: Number(parsed.timePerTurn) || 60,
+        timePerTurn: Number(parsed.timePerTurn) || 30,
         wordsPerPlayer: Number(parsed.wordsPerPlayer) || 3,
         rounds:
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
@@ -110,7 +110,7 @@ export default function WordSubmissionScreen() {
         <Text style={styles.errorText}>No hay jugadores configurados.</Text>
         <Button
           title="Volver a configurar"
-          onPress={() => router.replace("/config")}
+          onPress={() => router.replace("/teams")}
           variant="primary"
           size="large"
         />
