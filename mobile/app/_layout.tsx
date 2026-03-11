@@ -6,7 +6,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack>
         <Stack.Screen name="index" options={{ title: "WordWave" }} />
-        <Stack.Screen name="lobby" options={{ title: "Sala" }} />
+        <Stack.Screen name="config" options={{ title: "Configurar" }} />
+        <Stack.Screen
+          name="word-submission"
+          options={{ title: "Palabras", headerBackVisible: false }}
+        />
         <Stack.Screen
           name="game"
           options={{ title: "Jugando", headerShown: false }}

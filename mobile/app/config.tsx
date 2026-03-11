@@ -4,322 +4,258 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Switch,
   TouchableOpacity,
-  ActivityIndicator,
+  Switch,
   Alert,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
+import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
-import { gameApi } from "../src/services/api";
+
+type Team = 1 | 2;
+
+interface PlayerConfig {
+  id: string;
+  name: string;
+  team: Team;
+}
+
+interface GameSetup {
+  timePerTurn: number;
+  wordsPerPlayer: number;
+  rounds: boolean[];
+  players: PlayerConfig[];
+}
+
+const roundNames = [
+  "Ronda 1: Descripcion",
+  "Ronda 2: Una palabra",
+  "Ronda 3: Mimica",
+  "Ronda 4: Sonidos",
+];
 
 export default function ConfigScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const playerName = (params.playerName as string) || "Jugador";
-  const isEditMode = (params.mode as string) === "edit";
-  const roomCode = (params.roomCode as string) || "";
-  const playerId = (params.playerId as string) || "";
-  const playerTeam = (params.playerTeam as string) || "1";
-  const isHost = (params.isHost as string) || "true";
 
-  const parseBool = (value: string | undefined, fallback = false) => {
-    if (value === undefined) return fallback;
-    return value === "true";
-  };
+  const [timePerTurn, setTimePerTurn] = useState(60);
+  const [wordsPerPlayer, setWordsPerPlayer] = useState(3);
+  const [rounds, setRounds] = useState<boolean[]>([true, true, true, true]);
 
-  const parseRounds = (value: string | undefined) => {
-    if (!value) return [true, true, true, true];
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed) && parsed.length === 4) return parsed;
-    } catch {}
-    return [true, true, true, true];
-  };
-
-  const [config, setConfig] = useState({
-    timePerTurn: parseInt((params.timePerTurn as string) || "60", 10),
-    wordsPerPlayer: parseInt((params.wordsPerPlayer as string) || "3", 10),
-    maxPlayers: parseInt((params.maxPlayers as string) || "8", 10),
-    useCategories: false,
-    allowPlayerWords: true,
-    rounds: parseRounds(params.rounds as string), // 4 rounds: Description, One Word, Mime, Sounds
-  });
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [players, setPlayers] = useState<PlayerConfig[]>([]);
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerTeam, setNewPlayerTeam] = useState<Team>(1);
 
   const timeOptions = [30, 45, 60, 90, 120];
   const wordsOptions = [2, 3, 4, 5, 6];
-  const playerOptions = [4, 6, 8, 10, 12];
+
+  const teamOneCount = players.filter((player) => player.team === 1).length;
+  const teamTwoCount = players.filter((player) => player.team === 2).length;
 
   const toggleRound = (index: number) => {
-    const newRounds = [...config.rounds];
-    newRounds[index] = !newRounds[index];
-    setConfig({ ...config, rounds: newRounds });
+    setRounds((prev) => {
+      const next = [...prev];
+      next[index] = !next[index];
+      return next;
+    });
   };
 
-  const handleSaveConfig = async () => {
-    if (loading) return;
-
-    setLoading(true);
-    setError("");
-
-    try {
-      // Validate at least one round is enabled
-      if (!config.rounds.some((r) => r)) {
-        Alert.alert("Error", "Debes seleccionar al menos una ronda");
-        setLoading(false);
-        return;
-      }
-
-      if (isEditMode) {
-        if (!roomCode) {
-          throw new Error("No room code provided for update");
-        }
-
-        const response = await gameApi.updateRoomConfig(roomCode, {
-          seconds_per_turn: config.timePerTurn,
-          words_per_player: config.wordsPerPlayer,
-          use_categories: false,
-          allow_player_words: true,
-          max_players: config.maxPlayers,
-          active_rounds: config.rounds,
-        });
-
-        // Return to the same room with updated settings
-        router.replace({
-          pathname: "/lobby",
-          params: {
-            playerName,
-            isHost,
-            roomCode: response.room.code,
-            playerId,
-            playerTeam,
-            timePerTurn: response.room.seconds_per_turn.toString(),
-            wordsPerPlayer: response.room.words_per_player.toString(),
-            maxPlayers: response.room.max_players.toString(),
-            useCategories: "false",
-            allowPlayerWords: "true",
-            rounds: JSON.stringify(response.room.active_rounds),
-          },
-        });
-      } else {
-        // Create room with configuration
-        const response = await gameApi.createRoom(playerName, {
-          seconds_per_turn: config.timePerTurn,
-          words_per_player: config.wordsPerPlayer,
-          use_categories: false,
-          allow_player_words: true,
-          max_players: config.maxPlayers,
-          active_rounds: config.rounds,
-        });
-
-        // Navigate to lobby with room data
-        router.push({
-          pathname: "/lobby",
-          params: {
-            playerName,
-            isHost: "true",
-            roomCode: response.room.code,
-            playerId: response.player.id.toString(),
-            playerTeam: response.player.team?.toString() || "1",
-            timePerTurn: response.room.seconds_per_turn.toString(),
-            wordsPerPlayer: response.room.words_per_player.toString(),
-            maxPlayers: response.room.max_players.toString(),
-            useCategories: "false",
-            allowPlayerWords: "true",
-            rounds: JSON.stringify(response.room.active_rounds),
-          },
-        });
-      }
-    } catch (err: any) {
-      console.error("Error creating room:", err);
-      setError(
-        err.response?.data?.error ||
-          "No se pudo crear la sala. Verifica tu conexión.",
-      );
-      Alert.alert(
-        "Error",
-        err.response?.data?.error ||
-          "No se pudo crear la sala. Verifica tu conexión.",
-      );
-    } finally {
-      setLoading(false);
+  const addPlayer = () => {
+    const name = newPlayerName.trim();
+    if (!name) {
+      Alert.alert("Nombre requerido", "Escribe el nombre del jugador.");
+      return;
     }
+
+    setPlayers((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        name,
+        team: newPlayerTeam,
+      },
+    ]);
+
+    setNewPlayerName("");
   };
 
-  const roundNames = [
-    "Ronda 1: Descripción",
-    "Ronda 2: Una Palabra",
-    "Ronda 3: Mímica",
-    "Ronda 4: Sonidos",
-  ];
+  const removePlayer = (id: string) => {
+    setPlayers((prev) => prev.filter((player) => player.id !== id));
+  };
+
+  const startWordSubmission = () => {
+    if (!rounds.some(Boolean)) {
+      Alert.alert("Configuracion incompleta", "Activa al menos una ronda.");
+      return;
+    }
+
+    if (players.length < 2) {
+      Alert.alert(
+        "Jugadores insuficientes",
+        "Necesitas al menos 2 jugadores para empezar.",
+      );
+      return;
+    }
+
+    if (teamOneCount === 0 || teamTwoCount === 0) {
+      Alert.alert(
+        "Equipos incompletos",
+        "Debe haber al menos un jugador en cada equipo.",
+      );
+      return;
+    }
+
+    const setup: GameSetup = {
+      timePerTurn,
+      wordsPerPlayer,
+      rounds,
+      players,
+    };
+
+    router.push({
+      pathname: "/word-submission",
+      params: {
+        setup: JSON.stringify(setup),
+      },
+    });
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>
-            ← {isEditMode ? "Cancelar" : "Volver"}
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>
-          {isEditMode ? "Editar Configuración" : "Configuración de Partida"}
-        </Text>
+        <Text style={styles.title}>Configurar partida</Text>
+        <Text style={styles.subtitle}>Todo se juega en este dispositivo</Text>
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Time per turn */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⏱️ Tiempo por turno</Text>
-          <View style={styles.optionsContainer}>
-            {timeOptions.map((time) => (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Tiempo por turno</Text>
+          <View style={styles.optionsRow}>
+            {timeOptions.map((value) => (
               <TouchableOpacity
-                key={time}
+                key={value}
                 style={[
                   styles.optionButton,
-                  config.timePerTurn === time && styles.optionButtonActive,
+                  value === timePerTurn && styles.optionButtonActive,
                 ]}
-                onPress={() => setConfig({ ...config, timePerTurn: time })}
+                onPress={() => setTimePerTurn(value)}
               >
                 <Text
                   style={[
-                    styles.optionText,
-                    config.timePerTurn === time && styles.optionTextActive,
+                    styles.optionButtonText,
+                    value === timePerTurn && styles.optionButtonTextActive,
                   ]}
                 >
-                  {time}s
+                  {value}s
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Words per player */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Palabras por jugador</Text>
-          <View style={styles.optionsContainer}>
-            {wordsOptions.map((words) => (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Palabras por jugador</Text>
+          <View style={styles.optionsRow}>
+            {wordsOptions.map((value) => (
               <TouchableOpacity
-                key={words}
+                key={value}
                 style={[
                   styles.optionButton,
-                  config.wordsPerPlayer === words && styles.optionButtonActive,
+                  value === wordsPerPlayer && styles.optionButtonActive,
                 ]}
-                onPress={() => setConfig({ ...config, wordsPerPlayer: words })}
+                onPress={() => setWordsPerPlayer(value)}
               >
                 <Text
                   style={[
-                    styles.optionText,
-                    config.wordsPerPlayer === words && styles.optionTextActive,
+                    styles.optionButtonText,
+                    value === wordsPerPlayer && styles.optionButtonTextActive,
                   ]}
                 >
-                  {words}
+                  {value}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Max players */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>👥 Número máximo de jugadores</Text>
-          <View style={styles.optionsContainer}>
-            {playerOptions.map((players) => (
-              <TouchableOpacity
-                key={players}
-                style={[
-                  styles.optionButton,
-                  config.maxPlayers === players && styles.optionButtonActive,
-                ]}
-                onPress={() => setConfig({ ...config, maxPlayers: players })}
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    config.maxPlayers === players && styles.optionTextActive,
-                  ]}
-                >
-                  {players}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Rounds selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎮 Rondas activas</Text>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Rondas activas</Text>
           {roundNames.map((name, index) => (
-            <View key={index} style={styles.switchRow}>
+            <View key={name} style={styles.switchRow}>
               <Text style={styles.switchLabel}>{name}</Text>
               <Switch
-                value={config.rounds[index]}
+                value={rounds[index]}
                 onValueChange={() => toggleRound(index)}
-                trackColor={{ false: "#d1d5db", true: "#4ade80" }}
-                thumbColor={config.rounds[index] ? "#22c55e" : "#f3f4f6"}
               />
             </View>
           ))}
         </View>
 
-        {/* Word source */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📚 Origen de las palabras</Text>
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.switchLabel}>
-                Los jugadores crean palabras
-              </Text>
-              <Text style={styles.switchDescription}>
-                Opción fija: cada jugador añade sus propias palabras
-              </Text>
-            </View>
-            <Text style={styles.fixedValue}>Siempre</Text>
-          </View>
-        </View>
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Jugadores y equipos</Text>
 
-        {/* Summary */}
-        <View style={styles.summarySection}>
-          <Text style={styles.summaryTitle}>📋 Resumen</Text>
+          <Input
+            placeholder="Nombre del jugador"
+            value={newPlayerName}
+            onChangeText={setNewPlayerName}
+          />
+
+          <View style={styles.teamSelectRow}>
+            <TouchableOpacity
+              style={[
+                styles.teamButton,
+                newPlayerTeam === 1 && styles.teamButtonBlue,
+              ]}
+              onPress={() => setNewPlayerTeam(1)}
+            >
+              <Text style={styles.teamButtonText}>Equipo 1</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.teamButton,
+                newPlayerTeam === 2 && styles.teamButtonRed,
+              ]}
+              onPress={() => setNewPlayerTeam(2)}
+            >
+              <Text style={styles.teamButtonText}>Equipo 2</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Button
+            title="Agregar jugador"
+            onPress={addPlayer}
+            variant="secondary"
+            size="medium"
+          />
+
+          <View style={styles.playersList}>
+            {players.map((player) => (
+              <View key={player.id} style={styles.playerRow}>
+                <Text style={styles.playerText}>
+                  {player.name} - Equipo {player.team}
+                </Text>
+                <TouchableOpacity onPress={() => removePlayer(player.id)}>
+                  <Text style={styles.removeText}>Quitar</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {players.length === 0 && (
+              <Text style={styles.emptyText}>Todavia no hay jugadores.</Text>
+            )}
+          </View>
+
           <Text style={styles.summaryText}>
-            • Turnos de {config.timePerTurn} segundos{"\n"}•{" "}
-            {config.wordsPerPlayer} palabras por jugador{"\n"}• Hasta{" "}
-            {config.maxPlayers} jugadores{"\n"}•{" "}
-            {config.rounds.filter((r) => r).length} rondas activas
+            Equipo 1: {teamOneCount} | Equipo 2: {teamTwoCount}
           </Text>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
-        {error && <Text style={styles.errorText}>{error}</Text>}
-
         <Button
-          title={
-            loading
-              ? isEditMode
-                ? "Guardando..."
-                : "Creando sala..."
-              : isEditMode
-                ? "Guardar Cambios"
-                : "Crear Partida"
-          }
-          onPress={handleSaveConfig}
+          title="Continuar a palabras"
+          onPress={startWordSubmission}
           variant="primary"
           size="large"
-          disabled={loading}
         />
-
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#3b82f6" />
-            <Text style={styles.loadingText}>Configurando partida...</Text>
-          </View>
-        )}
       </View>
     </View>
   );
@@ -331,129 +267,129 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
   },
   header: {
-    backgroundColor: "white",
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingTop: 52,
+    paddingBottom: 16,
     paddingHorizontal: 20,
+    backgroundColor: "white",
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
-  backButton: {
-    marginBottom: 10,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: "#3b82f6",
-  },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1f2937",
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  subtitle: {
+    marginTop: 6,
+    color: "#6b7280",
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 16,
   },
-  section: {
+  card: {
     backgroundColor: "white",
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 14,
+    marginTop: 14,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#1f2937",
+    fontWeight: "700",
+    color: "#111827",
     marginBottom: 12,
   },
-  optionsContainer: {
+  optionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
   optionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#e5e7eb",
-    backgroundColor: "white",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
   },
   optionButtonActive: {
-    borderColor: "#3b82f6",
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#dbeafe",
+    borderColor: "#2563eb",
   },
-  optionText: {
-    fontSize: 16,
-    color: "#6b7280",
-    fontWeight: "500",
+  optionButtonText: {
+    color: "#374151",
+    fontWeight: "600",
   },
-  optionTextActive: {
-    color: "#3b82f6",
-    fontWeight: "700",
+  optionButtonTextActive: {
+    color: "#1d4ed8",
   },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    marginBottom: 10,
   },
   switchLabel: {
-    fontSize: 16,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  teamSelectRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+  },
+  teamButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    backgroundColor: "#ffffff",
+  },
+  teamButtonBlue: {
+    borderColor: "#2563eb",
+    backgroundColor: "#dbeafe",
+  },
+  teamButtonRed: {
+    borderColor: "#dc2626",
+    backgroundColor: "#fee2e2",
+  },
+  teamButtonText: {
+    fontWeight: "700",
     color: "#1f2937",
   },
-  switchDescription: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  fixedValue: {
-    fontSize: 14,
-    color: "#16a34a",
-    fontWeight: "700",
-  },
-  summarySection: {
-    backgroundColor: "#f0fdf4",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#166534",
-    marginBottom: 8,
-  },
-  summaryText: {
-    fontSize: 14,
-    color: "#166534",
-    lineHeight: 22,
-  },
-  footer: {
-    padding: 20,
-    backgroundColor: "white",
+  playersList: {
+    marginTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
-  },
-  errorText: {
-    color: "#ef4444",
-    fontSize: 14,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
+    paddingTop: 10,
     gap: 8,
   },
-  loadingText: {
-    fontSize: 14,
-    color: "#3b82f6",
+  playerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  playerText: {
+    color: "#111827",
+  },
+  removeText: {
+    color: "#dc2626",
+    fontWeight: "700",
+  },
+  emptyText: {
+    color: "#6b7280",
+  },
+  summaryText: {
+    marginTop: 12,
+    color: "#374151",
+    fontWeight: "600",
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    backgroundColor: "white",
   },
 });

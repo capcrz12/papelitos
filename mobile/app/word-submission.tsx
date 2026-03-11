@@ -1,239 +1,183 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Alert,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
+  Alert,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { useNavigation } from "@react-navigation/native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
-import { gameApi, WS_BASE_URL } from "../src/services/api";
-import { useSocket } from "../src/hooks/useSocket";
+
+interface PlayerConfig {
+  id: string;
+  name: string;
+  team: 1 | 2;
+}
+
+interface GameSetup {
+  timePerTurn: number;
+  wordsPerPlayer: number;
+  rounds: boolean[];
+  players: PlayerConfig[];
+}
+
+const defaultSetup: GameSetup = {
+  timePerTurn: 60,
+  wordsPerPlayer: 3,
+  rounds: [true, true, true, true],
+  players: [],
+};
 
 export default function WordSubmissionScreen() {
-  const router = useRouter();
-  const navigation = useNavigation<any>();
   const params = useLocalSearchParams();
-  const allowNavigationRef = useRef(false);
-  const phaseNavigationDoneRef = useRef(false);
+  const router = useRouter();
 
-  const roomCode = (params.roomCode as string) || "";
-  const playerId = (params.playerId as string) || "";
-  const playerName = (params.playerName as string) || "Jugador";
-  const isHost = (params.isHost as string) === "true";
-  const wordsPerPlayer = parseInt((params.wordsPerPlayer as string) || "3", 10);
-  const timePerTurn = parseInt((params.timePerTurn as string) || "60", 10);
-  const roundsParam = (params.rounds as string) || "[true,true,true,true]";
+  const setup = useMemo<GameSetup>(() => {
+    const raw = params.setup as string | undefined;
+    if (!raw) return defaultSetup;
 
-  const wsUrl = WS_BASE_URL;
-  const { on, off } = useSocket({
-    url: wsUrl,
-    roomCode,
-    enabled: true,
-    clientName: playerName,
-  });
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.players)) {
+        return defaultSetup;
+      }
+      return {
+        timePerTurn: Number(parsed.timePerTurn) || 60,
+        wordsPerPlayer: Number(parsed.wordsPerPlayer) || 3,
+        rounds:
+          Array.isArray(parsed.rounds) && parsed.rounds.length === 4
+            ? parsed.rounds
+            : [true, true, true, true],
+        players: parsed.players,
+      };
+    } catch {
+      return defaultSetup;
+    }
+  }, [params.setup]);
 
-  const [words, setWords] = useState<string[]>(
-    Array.from({ length: Math.max(1, wordsPerPlayer) }, () => ""),
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const [revealInput, setRevealInput] = useState(false);
+  const [currentWords, setCurrentWords] = useState<string[]>(
+    Array.from({ length: Math.max(1, setup.wordsPerPlayer) }, () => ""),
   );
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [statusText, setStatusText] = useState("Esperando envios...");
+  const [allWords, setAllWords] = useState<string[]>([]);
 
-  const navigateToGame = () => {
-    if (phaseNavigationDoneRef.current) return;
-    phaseNavigationDoneRef.current = true;
-    allowNavigationRef.current = true;
+  const totalPlayers = setup.players.length;
+  const currentPlayer = setup.players[currentPlayerIndex];
 
-    router.replace({
-      pathname: "/game",
-      params: {
-        roomCode,
-        playerId,
-        playerName,
-        isHost: isHost ? "true" : "false",
-        timePerTurn: String(timePerTurn),
-        wordsPerPlayer: String(wordsPerPlayer),
-        rounds: roundsParam,
-      },
-    });
-  };
+  const submitCurrentPlayerWords = () => {
+    const cleaned = currentWords.map((word) => word.trim()).filter(Boolean);
 
-  const cleanWords = useMemo(
-    () => words.map((w) => w.trim()).filter(Boolean),
-    [words],
-  );
-
-  useEffect(() => {
-    if (!roomCode) {
-      Alert.alert("Error", "No se encontro el codigo de sala", [
-        { text: "OK", onPress: () => router.replace("/") },
-      ]);
+    if (cleaned.length !== setup.wordsPerPlayer) {
+      Alert.alert(
+        "Faltan palabras",
+        `Debes escribir exactamente ${setup.wordsPerPlayer} palabras.`,
+      );
       return;
     }
 
-    let mounted = true;
+    const nextAllWords = [...allWords, ...cleaned];
 
-    const refreshStatus = async () => {
-      try {
-        const status = await gameApi.getWordsSubmissionStatus(roomCode);
-        if (!mounted) return;
+    if (currentPlayerIndex >= totalPlayers - 1) {
+      router.replace({
+        pathname: "/game",
+        params: {
+          setup: JSON.stringify(setup),
+          words: JSON.stringify(nextAllWords),
+        },
+      });
+      return;
+    }
 
-        setStatusText(
-          `${status.submitted_count}/${status.total_players} jugadores completaron sus palabras`,
-        );
-
-        if (status.phase === "playing" || status.all_submitted) {
-          navigateToGame();
-        }
-      } catch (err: any) {
-        const backendError =
-          err?.response?.data?.error || "No se pudo cargar el estado";
-        setStatusText(backendError);
-      }
-    };
-
-    refreshStatus();
-    const timer = setInterval(refreshStatus, 3000);
-
-    const handleProgress = (data: any) => {
-      setStatusText(
-        `${data.submitted_count}/${data.total_players} jugadores completaron sus palabras`,
-      );
-    };
-
-    const handleWordsCompleted = () => {
-      navigateToGame();
-    };
-
-    on("word_submission_progress", handleProgress);
-    on("words_phase_completed", handleWordsCompleted);
-
-    return () => {
-      mounted = false;
-      clearInterval(timer);
-      off("word_submission_progress", handleProgress);
-      off("words_phase_completed", handleWordsCompleted);
-    };
-  }, [
-    isHost,
-    off,
-    on,
-    playerId,
-    playerName,
-    roomCode,
-    router,
-    roundsParam,
-    timePerTurn,
-    wordsPerPlayer,
-  ]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("beforeRemove", (e: any) => {
-      if (allowNavigationRef.current) {
-        return;
-      }
-
-      e.preventDefault();
-      Alert.alert(
-        "Salir de la partida",
-        "Si sales ahora dejaras la partida en curso. ¿Seguro que quieres salir?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Salir",
-            style: "destructive",
-            onPress: () => {
-              allowNavigationRef.current = true;
-              navigation.dispatch(e.data.action);
-            },
-          },
-        ],
-      );
-    });
-
-    return unsubscribe;
-  }, [navigation]);
+    setAllWords(nextAllWords);
+    setCurrentPlayerIndex((prev) => prev + 1);
+    setCurrentWords(Array.from({ length: setup.wordsPerPlayer }, () => ""));
+    setRevealInput(false);
+  };
 
   const updateWord = (index: number, value: string) => {
-    setWords((prev) => prev.map((word, i) => (i === index ? value : word)));
+    setCurrentWords((prev) =>
+      prev.map((word, i) => (i === index ? value : word)),
+    );
   };
 
-  const submitWords = async () => {
-    if (submitted || loading) return;
-
-    if (cleanWords.length !== wordsPerPlayer) {
-      Alert.alert(
-        "Palabras incompletas",
-        `Debes enviar exactamente ${wordsPerPlayer} palabras.`,
-      );
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await gameApi.submitPlayerWords(roomCode, playerId, cleanWords);
-      setSubmitted(true);
-      setStatusText("Palabras enviadas. Esperando al resto de jugadores...");
-    } catch (err: any) {
-      const backendError =
-        err?.response?.data?.error || "No se pudieron enviar";
-      Alert.alert("Error", backendError);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!currentPlayer) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>No hay jugadores configurados.</Text>
+        <Button
+          title="Volver a configurar"
+          onPress={() => router.replace("/config")}
+          variant="primary"
+          size="large"
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Fase de palabras</Text>
+        <Text style={styles.title}>Carga de palabras</Text>
         <Text style={styles.subtitle}>
-          Cada jugador escribe {wordsPerPlayer} palabras desde su dispositivo
+          Jugador {currentPlayerIndex + 1} de {totalPlayers}
         </Text>
-        <Text style={styles.roomText}>Sala: {roomCode}</Text>
       </View>
 
-      <ScrollView
-        style={styles.form}
-        contentContainerStyle={styles.formContent}
-      >
-        {words.map((word, index) => (
-          <View key={index} style={styles.inputRow}>
-            <Text style={styles.inputLabel}>Palabra {index + 1}</Text>
-            <Input
-              value={word}
-              onChangeText={(value) => updateWord(index, value)}
-              placeholder={`Escribe palabra ${index + 1}`}
-              editable={!submitted}
+      {!revealInput ? (
+        <View style={styles.handoffCard}>
+          <Text style={styles.handoffTitle}>Pasa el dispositivo a:</Text>
+          <Text style={styles.playerName}>{currentPlayer.name}</Text>
+          <Text style={styles.playerTeam}>Equipo {currentPlayer.team}</Text>
+          <Button
+            title="Ya lo tiene"
+            onPress={() => setRevealInput(true)}
+            variant="primary"
+            size="large"
+          />
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            style={styles.form}
+            contentContainerStyle={styles.formContent}
+          >
+            {currentWords.map((word, index) => (
+              <View
+                key={`${currentPlayer.id}_${index}`}
+                style={styles.wordCard}
+              >
+                <Text style={styles.wordLabel}>Palabra {index + 1}</Text>
+                <Input
+                  value={word}
+                  onChangeText={(value) => updateWord(index, value)}
+                  placeholder={`Escribe palabra ${index + 1}`}
+                  autoCorrect={false}
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity onPress={() => setRevealInput(false)}>
+              <Text style={styles.backLink}>Ocultar y volver</Text>
+            </TouchableOpacity>
+            <Button
+              title={
+                currentPlayerIndex === totalPlayers - 1
+                  ? "Empezar partida"
+                  : "Guardar y siguiente jugador"
+              }
+              onPress={submitCurrentPlayerWords}
+              variant="primary"
+              size="large"
             />
           </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <Text style={styles.progressText}>{statusText}</Text>
-
-        <Button
-          title={
-            loading ? "Enviando..." : submitted ? "Enviado" : "Enviar palabras"
-          }
-          onPress={submitWords}
-          variant="primary"
-          size="large"
-          disabled={loading || submitted}
-        />
-
-        {!submitted && (
-          <TouchableOpacity onPress={submitWords}>
-            <Text style={styles.quickSubmitText}>Enviar ahora</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+        </>
+      )}
     </View>
   );
 }
@@ -243,11 +187,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+  centerContainer: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    gap: 16,
+  },
+  errorText: {
+    textAlign: "center",
+    fontSize: 18,
+    color: "#b91c1c",
+    fontWeight: "700",
+  },
   header: {
     backgroundColor: "white",
     paddingTop: 56,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
   },
@@ -257,13 +214,32 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
   subtitle: {
-    marginTop: 8,
+    marginTop: 6,
     color: "#4b5563",
-    fontSize: 15,
   },
-  roomText: {
-    marginTop: 10,
+  handoffCard: {
+    margin: 20,
+    padding: 20,
+    borderRadius: 14,
+    backgroundColor: "white",
+    gap: 12,
+  },
+  handoffTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+    textAlign: "center",
+  },
+  playerName: {
+    fontSize: 34,
+    fontWeight: "800",
+    textAlign: "center",
     color: "#1d4ed8",
+  },
+  playerTeam: {
+    textAlign: "center",
+    color: "#374151",
+    marginBottom: 8,
     fontWeight: "600",
   },
   form: {
@@ -273,32 +249,26 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-  inputRow: {
+  wordCard: {
     backgroundColor: "white",
     borderRadius: 12,
     padding: 14,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
   },
-  inputLabel: {
+  wordLabel: {
     marginBottom: 8,
     color: "#374151",
-    fontWeight: "600",
+    fontWeight: "700",
   },
   footer: {
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
     padding: 16,
     backgroundColor: "white",
-    gap: 10,
+    gap: 12,
   },
-  progressText: {
-    textAlign: "center",
-    color: "#4b5563",
-  },
-  quickSubmitText: {
+  backLink: {
     textAlign: "center",
     color: "#2563eb",
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });
