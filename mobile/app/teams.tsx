@@ -4,6 +4,7 @@ import {
   Easing,
   LayoutAnimation,
   Platform,
+  type LayoutChangeEvent,
   Pressable,
   View,
   Text,
@@ -15,8 +16,18 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Reanimated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { MotiView } from "moti";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
+import { LoadingOverlay } from "../src/components/LoadingOverlay";
 
 type Team = 1 | 2;
 
@@ -29,7 +40,79 @@ interface PlayerConfig {
 interface MatchSettings {
   timePerTurn: number;
   wordsPerPlayer: number;
+  skipsPerTurn: number | null;
   rounds: boolean[];
+}
+
+const formatSkipsPerTurn = (value: number | null) =>
+  value === null
+    ? "pases ilimitados"
+    : `${value} pase${value === 1 ? "" : "s"}`;
+
+interface DropZone {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface DraggablePlayerChipProps {
+  player: PlayerConfig;
+  onDrop: (playerId: string, x: number, y: number) => void;
+  onRemove: (id: string) => void;
+}
+
+function DraggablePlayerChip({
+  player,
+  onDrop,
+  onRemove,
+}: DraggablePlayerChipProps) {
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const shadowOpacity = useSharedValue(0.08);
+
+  const panGesture = Gesture.Pan()
+    .minDistance(2)
+    .onBegin(() => {
+      scale.value = withSpring(1.06);
+      shadowOpacity.value = withTiming(0.22, { duration: 160 });
+    })
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
+      translateY.value = event.translationY;
+    })
+    .onFinalize((event) => {
+      scale.value = withSpring(1);
+      shadowOpacity.value = withTiming(0.08, { duration: 160 });
+      translateX.value = withSpring(0, { damping: 12, stiffness: 190 });
+      translateY.value = withSpring(0, { damping: 12, stiffness: 190 });
+      runOnJS(onDrop)(player.id, event.absoluteX, event.absoluteY);
+    });
+
+  const animatedChipStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    shadowOpacity: shadowOpacity.value,
+    zIndex: scale.value > 1 ? 20 : 1,
+  }));
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <Reanimated.View style={[styles.playerChip, animatedChipStyle]}>
+        <Text style={styles.playerChipText}>{player.name}</Text>
+        <TouchableOpacity
+          onPress={() => onRemove(player.id)}
+          style={styles.playerChipRemoveButton}
+        >
+          <Text style={styles.playerChipClose}>×</Text>
+        </TouchableOpacity>
+      </Reanimated.View>
+    </GestureDetector>
+  );
 }
 
 export default function TeamsScreen() {
@@ -60,6 +143,7 @@ export default function TeamsScreen() {
       return {
         timePerTurn: 30,
         wordsPerPlayer: 3,
+        skipsPerTurn: 1,
         rounds: [true, true, true, true],
       };
     }
@@ -68,6 +152,12 @@ export default function TeamsScreen() {
       return {
         timePerTurn: Number(parsed.timePerTurn) || 30,
         wordsPerPlayer: Number(parsed.wordsPerPlayer) || 3,
+        skipsPerTurn:
+          parsed.skipsPerTurn === null
+            ? null
+            : Number(parsed.skipsPerTurn) > 0
+              ? Number(parsed.skipsPerTurn)
+              : 1,
         rounds:
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
@@ -77,6 +167,7 @@ export default function TeamsScreen() {
       return {
         timePerTurn: 30,
         wordsPerPlayer: 3,
+        skipsPerTurn: 1,
         rounds: [true, true, true, true],
       };
     }
@@ -86,6 +177,13 @@ export default function TeamsScreen() {
   const [newName, setNewName] = useState("");
   const [activeTeam, setActiveTeam] = useState<Team>(1);
   const [settings] = useState<MatchSettings>(initialSettings);
+  const [isStartingMatch, setIsStartingMatch] = useState(false);
+  const [dropZones, setDropZones] = useState<Partial<Record<Team, DropZone>>>(
+    {},
+  );
+
+  const teamOneRef = useRef<View>(null);
+  const teamTwoRef = useRef<View>(null);
   const gearSpin = useRef(new Animated.Value(0)).current;
   const ctaPulse = useRef(new Animated.Value(1)).current;
 
@@ -122,6 +220,63 @@ export default function TeamsScreen() {
     setPlayers((prev) => prev.filter((player) => player.id !== id));
   };
 
+  const updateDropZone = (team: Team) => {
+    const ref = team === 1 ? teamOneRef.current : teamTwoRef.current;
+    if (!ref) return;
+
+    ref.measureInWindow((x, y, width, height) => {
+      setDropZones((prev) => ({
+        ...prev,
+        [team]: { x, y, width, height },
+      }));
+    });
+  };
+
+  const updateDropZones = () => {
+    requestAnimationFrame(() => {
+      updateDropZone(1);
+      updateDropZone(2);
+    });
+  };
+
+  const handleTeamCardLayout = (_: LayoutChangeEvent) => {
+    updateDropZones();
+  };
+
+  const pointInsideZone = (
+    zone: DropZone | undefined,
+    x: number,
+    y: number,
+  ) => {
+    if (!zone) return false;
+    return (
+      x >= zone.x &&
+      x <= zone.x + zone.width &&
+      y >= zone.y &&
+      y <= zone.y + zone.height
+    );
+  };
+
+  const movePlayerToTeam = (playerId: string, team: Team) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setPlayers((prev) =>
+      prev.map((player) =>
+        player.id === playerId ? { ...player, team } : player,
+      ),
+    );
+  };
+
+  const handleDropPlayer = (playerId: string, x: number, y: number) => {
+    if (pointInsideZone(dropZones[1], x, y)) {
+      movePlayerToTeam(playerId, 1);
+      return;
+    }
+
+    if (pointInsideZone(dropZones[2], x, y)) {
+      movePlayerToTeam(playerId, 2);
+    }
+  };
+
   useEffect(() => {
     Animated.loop(
       Animated.timing(gearSpin, {
@@ -152,6 +307,10 @@ export default function TeamsScreen() {
     ).start();
   }, [ctaPulse]);
 
+  useEffect(() => {
+    updateDropZones();
+  }, [players.length]);
+
   const startMatch = () => {
     if (players.length < 2) {
       Alert.alert(
@@ -169,17 +328,22 @@ export default function TeamsScreen() {
       return;
     }
 
-    router.push({
-      pathname: "/word-submission",
-      params: {
-        setup: JSON.stringify({
-          players,
-          timePerTurn: settings.timePerTurn,
-          wordsPerPlayer: settings.wordsPerPlayer,
-          rounds: settings.rounds,
-        }),
-      },
-    });
+    setIsStartingMatch(true);
+    setTimeout(() => {
+      router.push({
+        pathname: "/word-submission",
+        params: {
+          setup: JSON.stringify({
+            players,
+            timePerTurn: settings.timePerTurn,
+            wordsPerPlayer: settings.wordsPerPlayer,
+            skipsPerTurn: settings.skipsPerTurn,
+            rounds: settings.rounds,
+          }),
+        },
+      });
+      setIsStartingMatch(false);
+    }, 700);
   };
 
   return (
@@ -255,62 +419,75 @@ export default function TeamsScreen() {
         style={styles.teamsArea}
         contentContainerStyle={styles.teamsContent}
       >
-        <Pressable
-          style={[styles.teamCard, styles.teamCardBlue]}
-          onPress={() => setActiveTeam(1)}
+        <MotiView
+          from={{ opacity: 0, translateY: 14 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: "timing", duration: 400 }}
         >
-          <Text style={styles.teamTitle}>Equipo Azul</Text>
-          <Text style={styles.teamCounter}>
-            {team1Players.length} jugadores
-          </Text>
-          <View style={styles.chipsWrap}>
-            {team1Players.map((player) => (
-              <Pressable
-                key={player.id}
-                style={styles.playerChip}
-                onPress={() => removePlayer(player.id)}
-              >
-                <Text style={styles.playerChipText}>{player.name}</Text>
-                <Text style={styles.playerChipClose}>×</Text>
-              </Pressable>
-            ))}
-          </View>
-          {team1Players.length === 0 && (
-            <Text style={styles.emptyText}>Sin jugadores por ahora</Text>
-          )}
-        </Pressable>
+          <Pressable
+            ref={teamOneRef}
+            style={[styles.teamCard, styles.teamCardBlue]}
+            onPress={() => setActiveTeam(1)}
+            onLayout={handleTeamCardLayout}
+          >
+            <Text style={styles.teamTitle}>Equipo Azul</Text>
+            <Text style={styles.teamCounter}>
+              {team1Players.length} jugadores
+            </Text>
+            <View style={styles.chipsWrap}>
+              {team1Players.map((player) => (
+                <DraggablePlayerChip
+                  key={player.id}
+                  player={player}
+                  onDrop={handleDropPlayer}
+                  onRemove={removePlayer}
+                />
+              ))}
+            </View>
+            {team1Players.length === 0 && (
+              <Text style={styles.emptyText}>Sin jugadores por ahora</Text>
+            )}
+          </Pressable>
+        </MotiView>
 
-        <Pressable
-          style={[styles.teamCard, styles.teamCardRed]}
-          onPress={() => setActiveTeam(2)}
+        <MotiView
+          from={{ opacity: 0, translateY: 14 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: "timing", duration: 460, delay: 60 }}
         >
-          <Text style={styles.teamTitle}>Equipo Rojo</Text>
-          <Text style={styles.teamCounter}>
-            {team2Players.length} jugadores
-          </Text>
-          <View style={styles.chipsWrap}>
-            {team2Players.map((player) => (
-              <Pressable
-                key={player.id}
-                style={styles.playerChip}
-                onPress={() => removePlayer(player.id)}
-              >
-                <Text style={styles.playerChipText}>{player.name}</Text>
-                <Text style={styles.playerChipClose}>×</Text>
-              </Pressable>
-            ))}
-          </View>
-          {team2Players.length === 0 && (
-            <Text style={styles.emptyText}>Sin jugadores por ahora</Text>
-          )}
-        </Pressable>
+          <Pressable
+            ref={teamTwoRef}
+            style={[styles.teamCard, styles.teamCardRed]}
+            onPress={() => setActiveTeam(2)}
+            onLayout={handleTeamCardLayout}
+          >
+            <Text style={styles.teamTitle}>Equipo Rojo</Text>
+            <Text style={styles.teamCounter}>
+              {team2Players.length} jugadores
+            </Text>
+            <View style={styles.chipsWrap}>
+              {team2Players.map((player) => (
+                <DraggablePlayerChip
+                  key={player.id}
+                  player={player}
+                  onDrop={handleDropPlayer}
+                  onRemove={removePlayer}
+                />
+              ))}
+            </View>
+            {team2Players.length === 0 && (
+              <Text style={styles.emptyText}>Sin jugadores por ahora</Text>
+            )}
+          </Pressable>
+        </MotiView>
       </ScrollView>
 
       <View style={styles.footer}>
         <Text style={styles.footerHint}>Total: {players.length} jugadores</Text>
         <Text style={styles.footerConfigText}>
           {settings.timePerTurn}s por turno · {settings.wordsPerPlayer} palabras
-          · {settings.rounds.filter(Boolean).length} rondas
+          · {formatSkipsPerTurn(settings.skipsPerTurn)} ·{" "}
+          {settings.rounds.filter(Boolean).length} rondas
         </Text>
         <Animated.View style={{ transform: [{ scale: ctaPulse }] }}>
           <Button
@@ -321,6 +498,10 @@ export default function TeamsScreen() {
           />
         </Animated.View>
       </View>
+      <LoadingOverlay
+        visible={isStartingMatch}
+        title="Preparando ronda inicial..."
+      />
     </View>
   );
 }
@@ -459,12 +640,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 9,
+    shadowOpacity: 0.08,
+    elevation: 2,
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 7,
     paddingLeft: 12,
     paddingRight: 9,
     gap: 8,
+  },
+  playerChipRemoveButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fee2e2",
   },
   playerChipText: {
     color: "#0f172a",

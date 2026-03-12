@@ -8,8 +8,10 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { AnimatePresence, MotiView } from "moti";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
+import { LoadingOverlay } from "../src/components/LoadingOverlay";
 
 interface PlayerConfig {
   id: string;
@@ -20,6 +22,7 @@ interface PlayerConfig {
 interface GameSetup {
   timePerTurn: number;
   wordsPerPlayer: number;
+  skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
 }
@@ -27,6 +30,7 @@ interface GameSetup {
 const defaultSetup: GameSetup = {
   timePerTurn: 30,
   wordsPerPlayer: 3,
+  skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
 };
@@ -47,6 +51,12 @@ export default function WordSubmissionScreen() {
       return {
         timePerTurn: Number(parsed.timePerTurn) || 30,
         wordsPerPlayer: Number(parsed.wordsPerPlayer) || 3,
+        skipsPerTurn:
+          parsed.skipsPerTurn === null
+            ? null
+            : Number(parsed.skipsPerTurn) > 0
+              ? Number(parsed.skipsPerTurn)
+              : 1,
         rounds:
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
@@ -64,6 +74,7 @@ export default function WordSubmissionScreen() {
     Array.from({ length: Math.max(1, setup.wordsPerPlayer) }, () => ""),
   );
   const [allWords, setAllWords] = useState<string[]>([]);
+  const [isPreparingGame, setIsPreparingGame] = useState(false);
 
   const totalPlayers = setup.players.length;
   const currentPlayer = setup.players[currentPlayerIndex];
@@ -82,13 +93,17 @@ export default function WordSubmissionScreen() {
     const nextAllWords = [...allWords, ...cleaned];
 
     if (currentPlayerIndex >= totalPlayers - 1) {
-      router.replace({
-        pathname: "/game",
-        params: {
-          setup: JSON.stringify(setup),
-          words: JSON.stringify(nextAllWords),
-        },
-      });
+      setIsPreparingGame(true);
+      setTimeout(() => {
+        router.replace({
+          pathname: "/game",
+          params: {
+            setup: JSON.stringify(setup),
+            words: JSON.stringify(nextAllWords),
+          },
+        });
+        setIsPreparingGame(false);
+      }, 700);
       return;
     }
 
@@ -127,57 +142,81 @@ export default function WordSubmissionScreen() {
         </Text>
       </View>
 
-      {!revealInput ? (
-        <View style={styles.handoffCard}>
-          <Text style={styles.handoffTitle}>Pasa el dispositivo a:</Text>
-          <Text style={styles.playerName}>{currentPlayer.name}</Text>
-          <Text style={styles.playerTeam}>Equipo {currentPlayer.team}</Text>
-          <Button
-            title="Ya lo tiene"
-            onPress={() => setRevealInput(true)}
-            variant="primary"
-            size="large"
-          />
-        </View>
-      ) : (
-        <>
-          <ScrollView
-            style={styles.form}
-            contentContainerStyle={styles.formContent}
+      <AnimatePresence>
+        {!revealInput ? (
+          <MotiView
+            key="handoff"
+            from={{ opacity: 0, scale: 0.96, translateY: 16 }}
+            animate={{ opacity: 1, scale: 1, translateY: 0 }}
+            exit={{ opacity: 0, scale: 0.96, translateY: -16 }}
+            transition={{ type: "timing", duration: 300 }}
+            style={styles.handoffCard}
           >
-            {currentWords.map((word, index) => (
-              <View
-                key={`${currentPlayer.id}_${index}`}
-                style={styles.wordCard}
-              >
-                <Text style={styles.wordLabel}>Palabra {index + 1}</Text>
-                <Input
-                  value={word}
-                  onChangeText={(value) => updateWord(index, value)}
-                  placeholder={`Escribe palabra ${index + 1}`}
-                  autoCorrect={false}
-                />
-              </View>
-            ))}
-          </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity onPress={() => setRevealInput(false)}>
-              <Text style={styles.backLink}>Ocultar y volver</Text>
-            </TouchableOpacity>
+            <Text style={styles.handoffTitle}>Pasa el dispositivo a:</Text>
+            <Text style={styles.playerName}>{currentPlayer.name}</Text>
+            <Text style={styles.playerTeam}>Equipo {currentPlayer.team}</Text>
             <Button
-              title={
-                currentPlayerIndex === totalPlayers - 1
-                  ? "Empezar partida"
-                  : "Guardar y siguiente jugador"
-              }
-              onPress={submitCurrentPlayerWords}
+              title="Ya lo tiene"
+              onPress={() => setRevealInput(true)}
               variant="primary"
               size="large"
             />
-          </View>
-        </>
-      )}
+          </MotiView>
+        ) : (
+          <MotiView
+            key="form"
+            from={{ opacity: 0, translateY: 16 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            exit={{ opacity: 0, translateY: -16 }}
+            transition={{ type: "timing", duration: 260 }}
+            style={styles.revealArea}
+          >
+            <ScrollView
+              style={styles.form}
+              contentContainerStyle={styles.formContent}
+            >
+              {currentWords.map((word, index) => (
+                <MotiView
+                  key={`${currentPlayer.id}_${index}`}
+                  from={{ opacity: 0, translateX: -14 }}
+                  animate={{ opacity: 1, translateX: 0 }}
+                  transition={{
+                    type: "timing",
+                    duration: 260,
+                    delay: index * 55,
+                  }}
+                  style={styles.wordCard}
+                >
+                  <Text style={styles.wordLabel}>Palabra {index + 1}</Text>
+                  <Input
+                    value={word}
+                    onChangeText={(value) => updateWord(index, value)}
+                    placeholder={`Escribe palabra ${index + 1}`}
+                    autoCorrect={false}
+                  />
+                </MotiView>
+              ))}
+            </ScrollView>
+
+            <View style={styles.footer}>
+              <TouchableOpacity onPress={() => setRevealInput(false)}>
+                <Text style={styles.backLink}>Ocultar y volver</Text>
+              </TouchableOpacity>
+              <Button
+                title={
+                  currentPlayerIndex === totalPlayers - 1
+                    ? "Empezar partida"
+                    : "Guardar y siguiente jugador"
+                }
+                onPress={submitCurrentPlayerWords}
+                variant="primary"
+                size="large"
+              />
+            </View>
+          </MotiView>
+        )}
+      </AnimatePresence>
+      <LoadingOverlay visible={isPreparingGame} title="Mezclando palabras..." />
     </View>
   );
 }
@@ -243,6 +282,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   form: {
+    flex: 1,
+  },
+  revealArea: {
     flex: 1,
   },
   formContent: {

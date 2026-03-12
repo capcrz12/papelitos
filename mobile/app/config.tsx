@@ -20,9 +20,15 @@ interface PlayerConfig {
 interface GameSetup {
   timePerTurn: number;
   wordsPerPlayer: number;
+  skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
 }
+
+const skipOptions = [1, 2, 3, null] as const;
+
+const formatSkipsPerTurn = (value: number | null) =>
+  value === null ? "Ilimitado" : String(value);
 
 const roundNames = [
   "Ronda 1: Descripcion",
@@ -53,6 +59,7 @@ export default function ConfigScreen() {
       return {
         timePerTurn: 30,
         wordsPerPlayer: 3,
+        skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
       };
     }
@@ -61,6 +68,12 @@ export default function ConfigScreen() {
       return {
         timePerTurn: Number(parsed.timePerTurn) || 30,
         wordsPerPlayer: Number(parsed.wordsPerPlayer) || 3,
+        skipsPerTurn:
+          parsed.skipsPerTurn === null
+            ? null
+            : Number(parsed.skipsPerTurn) > 0
+              ? Number(parsed.skipsPerTurn)
+              : 1,
         rounds:
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
@@ -70,6 +83,7 @@ export default function ConfigScreen() {
       return {
         timePerTurn: 30,
         wordsPerPlayer: 3,
+        skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
       };
     }
@@ -78,6 +92,9 @@ export default function ConfigScreen() {
   const [timePerTurn, setTimePerTurn] = useState(currentSettings.timePerTurn);
   const [wordsPerPlayer, setWordsPerPlayer] = useState(
     currentSettings.wordsPerPlayer,
+  );
+  const [skipsPerTurn, setSkipsPerTurn] = useState<number | null>(
+    currentSettings.skipsPerTurn,
   );
   const [rounds, setRounds] = useState<boolean[]>(currentSettings.rounds);
 
@@ -105,6 +122,7 @@ export default function ConfigScreen() {
         settings: JSON.stringify({
           timePerTurn,
           wordsPerPlayer,
+          skipsPerTurn,
           rounds,
         }),
       },
@@ -170,6 +188,34 @@ export default function ConfigScreen() {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Pases por turno</Text>
+          <View style={styles.optionsRow}>
+            {skipOptions.map((value) => {
+              const isActive = value === skipsPerTurn;
+              return (
+                <TouchableOpacity
+                  key={value === null ? "unlimited" : value}
+                  style={[
+                    styles.optionButton,
+                    isActive && styles.optionButtonActive,
+                  ]}
+                  onPress={() => setSkipsPerTurn(value)}
+                >
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      isActive && styles.optionButtonTextActive,
+                    ]}
+                  >
+                    {formatSkipsPerTurn(value)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>Rondas activas</Text>
           {roundNames.map((name, index) => (
             <View key={name} style={styles.switchRow}>
@@ -192,6 +238,9 @@ export default function ConfigScreen() {
           </Text>
           <Text style={styles.summaryText}>
             Palabras por jugador: {wordsPerPlayer}
+          </Text>
+          <Text style={styles.summaryText}>
+            Pases por turno: {formatSkipsPerTurn(skipsPerTurn)}
           </Text>
         </View>
       </ScrollView>
