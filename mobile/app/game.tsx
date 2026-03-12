@@ -57,8 +57,7 @@ const SOUND_ASSETS = {
   success: require("../assets/sounds/success.mp3"),
   clock: require("../assets/sounds/clock.mp3"),
   skip: require("../assets/sounds/skip.mp3"),
-  timeUp: require("../assets/sounds/timeUp.mp3"),
-} satisfies Record<"start" | "success" | "clock" | "skip" | "timeUp", AVPlaybackSource>;
+} satisfies Record<"start" | "success" | "clock" | "skip", AVPlaybackSource>;
 
 const shuffle = (values: string[]) => {
   const copy = [...values];
@@ -161,7 +160,6 @@ export default function GameScreen() {
 
   const guessedThisTurnRef = useRef(0);
   const clockAlertPlayedRef = useRef(false);
-  const timeUpAlertPlayedRef = useRef(false);
   const allowExitRef = useRef(false);
   const soundEffectsRef = useRef<
     Partial<Record<keyof typeof SOUND_ASSETS, Audio.Sound>>
@@ -219,19 +217,6 @@ export default function GameScreen() {
   }, [timeLeft, turnActive]);
 
   useEffect(() => {
-    if (!turnActive || timeUpAlertPlayedRef.current) {
-      return;
-    }
-
-    if (timeLeft !== 0) {
-      return;
-    }
-
-    timeUpAlertPlayedRef.current = true;
-    void playSoundEffect("timeUp");
-  }, [timeLeft, turnActive]);
-
-  useEffect(() => {
     if (preTurnCountdown === null) return;
 
     const countdownTimer = setInterval(() => {
@@ -244,7 +229,6 @@ export default function GameScreen() {
           setSkipsLeft(setup.skipsPerTurn);
           setCurrentWord(queue[0]);
           clockAlertPlayedRef.current = false;
-          timeUpAlertPlayedRef.current = false;
           return null;
         }
 
@@ -458,7 +442,6 @@ export default function GameScreen() {
     setTimeLeft(setup.timePerTurn);
     setSkipsLeft(setup.skipsPerTurn);
     clockAlertPlayedRef.current = false;
-    timeUpAlertPlayedRef.current = false;
     void playSoundEffect("start");
   };
 
