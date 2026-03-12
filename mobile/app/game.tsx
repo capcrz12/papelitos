@@ -57,7 +57,8 @@ const SOUND_ASSETS = {
   success: require("../assets/sounds/success.mp3"),
   clock: require("../assets/sounds/clock.mp3"),
   skip: require("../assets/sounds/skip.mp3"),
-} satisfies Record<"start" | "success" | "clock" | "skip", AVPlaybackSource>;
+  timeUp: require("../assets/sounds/timeUp.mp3"),
+} satisfies Record<"start" | "success" | "clock" | "skip" | "timeUp", AVPlaybackSource>;
 
 const shuffle = (values: string[]) => {
   const copy = [...values];
@@ -160,6 +161,7 @@ export default function GameScreen() {
 
   const guessedThisTurnRef = useRef(0);
   const clockAlertPlayedRef = useRef(false);
+  const timeUpAlertPlayedRef = useRef(false);
   const allowExitRef = useRef(false);
   const soundEffectsRef = useRef<
     Partial<Record<keyof typeof SOUND_ASSETS, Audio.Sound>>
@@ -217,14 +219,17 @@ export default function GameScreen() {
   }, [timeLeft, turnActive]);
 
   useEffect(() => {
-    if (!showRoundIntro || gameFinished) return;
+    if (!turnActive || timeUpAlertPlayedRef.current) {
+      return;
+    }
 
-    const introTimer = setTimeout(() => {
-      setShowRoundIntro(false);
-    }, 2600);
+    if (timeLeft !== 0) {
+      return;
+    }
 
-    return () => clearTimeout(introTimer);
-  }, [showRoundIntro, gameFinished]);
+    timeUpAlertPlayedRef.current = true;
+    void playSoundEffect("timeUp");
+  }, [timeLeft, turnActive]);
 
   useEffect(() => {
     if (preTurnCountdown === null) return;
@@ -239,6 +244,7 @@ export default function GameScreen() {
           setSkipsLeft(setup.skipsPerTurn);
           setCurrentWord(queue[0]);
           clockAlertPlayedRef.current = false;
+          timeUpAlertPlayedRef.current = false;
           return null;
         }
 
@@ -432,6 +438,10 @@ export default function GameScreen() {
     advancePlayer();
   };
 
+  const handleRoundIntroComplete = () => {
+    setShowRoundIntro(false);
+  };
+
   const startTurn = () => {
     if (!currentPlayer || gameFinished) return;
 
@@ -448,6 +458,7 @@ export default function GameScreen() {
     setTimeLeft(setup.timePerTurn);
     setSkipsLeft(setup.skipsPerTurn);
     clockAlertPlayedRef.current = false;
+    timeUpAlertPlayedRef.current = false;
     void playSoundEffect("start");
   };
 
@@ -557,6 +568,12 @@ export default function GameScreen() {
             <Text style={styles.roundIntroTitle}>Ronda {introRoundNumber}</Text>
             <Text style={styles.roundIntroSubtitle}>{introRoundName}</Text>
             <Text style={styles.roundIntroHint}>{introRoundInstruction}</Text>
+            <TouchableOpacity
+              style={styles.roundIntroButton}
+              onPress={handleRoundIntroComplete}
+            >
+              <Text style={styles.roundIntroButtonText}>Listo</Text>
+            </TouchableOpacity>
           </MotiView>
         </View>
       ) : preTurnCountdown !== null ? (
@@ -939,6 +956,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     lineHeight: 25,
+  },
+  roundIntroButton: {
+    marginTop: 28,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#020617",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  roundIntroButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   countdownScreen: {
     flex: 1,
