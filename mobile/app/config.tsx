@@ -15,7 +15,7 @@ import { Button } from "../src/components/Button";
 interface PlayerConfig {
   id: string;
   name: string;
-  team: 1 | 2;
+  team: number;
 }
 
 interface GameSetup {
@@ -24,16 +24,25 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
-  teamNames?: {
-    team1: string;
-    team2: string;
-  };
+  teamNames?: Record<string, string>;
+  teamOrder?: number[];
 }
 
 const skipOptions = [1, 2, 3, null] as const;
 
 const formatSkipsPerTurn = (value: number | null) =>
   value === null ? "Ilimitado" : String(value);
+
+const TEAM_COLOR_NAMES: Record<number, string> = {
+  1: "Azul",
+  2: "Rojo",
+  3: "Verde",
+  4: "Morado",
+  5: "Naranja",
+};
+
+const getDefaultTeamName = (teamId: number) =>
+  TEAM_COLOR_NAMES[teamId] || "Equipo";
 
 const roundNames = [
   "Ronda 1: Descripcion",
@@ -66,10 +75,8 @@ export default function ConfigScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
-        teamNames: {
-          team1: "Azul",
-          team2: "Rojo",
-        },
+        teamNames: { "1": "Azul", "2": "Rojo" },
+        teamOrder: [1, 2],
       };
     }
     try {
@@ -87,18 +94,36 @@ export default function ConfigScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
-        teamNames: {
-          team1:
-            typeof parsed.teamNames?.team1 === "string" &&
-            parsed.teamNames.team1.trim().length > 0
-              ? parsed.teamNames.team1.trim()
-              : "Azul",
-          team2:
-            typeof parsed.teamNames?.team2 === "string" &&
-            parsed.teamNames.team2.trim().length > 0
-              ? parsed.teamNames.team2.trim()
-              : "Rojo",
-        },
+        teamNames:
+          parsed.teamNames && typeof parsed.teamNames === "object"
+            ? Object.entries(
+                parsed.teamNames as Record<string, unknown>,
+              ).reduce<Record<string, string>>((acc, [key, value]) => {
+                const id = Number(key);
+                if (
+                  Number.isInteger(id) &&
+                  id > 0 &&
+                  typeof value === "string"
+                ) {
+                  acc[String(id)] = value.trim() || getDefaultTeamName(id);
+                  return acc;
+                }
+
+                const match = key.match(/^team(\d+)$/i);
+                if (match && typeof value === "string") {
+                  const teamId = Number(match[1]);
+                  acc[String(teamId)] =
+                    value.trim() || getDefaultTeamName(teamId);
+                }
+                return acc;
+              }, {})
+            : { "1": getDefaultTeamName(1), "2": getDefaultTeamName(2) },
+        teamOrder:
+          Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2
+            ? parsed.teamOrder
+                .map((value: unknown) => Number(value))
+                .filter((value: number) => Number.isInteger(value) && value > 0)
+            : [1, 2],
       };
     } catch {
       return {
@@ -106,10 +131,8 @@ export default function ConfigScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
-        teamNames: {
-          team1: "Azul",
-          team2: "Rojo",
-        },
+        teamNames: { "1": "Azul", "2": "Rojo" },
+        teamOrder: [1, 2],
       };
     }
   }, [params.settings]);
@@ -150,6 +173,7 @@ export default function ConfigScreen() {
           skipsPerTurn,
           rounds,
           teamNames: currentSettings.teamNames,
+          teamOrder: currentSettings.teamOrder,
         }),
       },
     });

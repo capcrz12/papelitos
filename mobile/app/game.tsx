@@ -21,7 +21,7 @@ import { Button } from "../src/components/Button";
 interface PlayerConfig {
   id: string;
   name: string;
-  team: 1 | 2;
+  team: number;
 }
 
 interface GameSetup {
@@ -30,10 +30,8 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
-  teamNames: {
-    team1: string;
-    team2: string;
-  };
+  teamOrder: number[];
+  teamNames: Record<string, string>;
 }
 
 const ROUND_META = [
@@ -50,15 +48,27 @@ const ROUND_INSTRUCTIONS: Record<number, string> = {
   4: "Sin hablar: usa solo sonidos.",
 };
 
+const TEAM_COLOR_NAMES: Record<number, string> = {
+  1: "Azul",
+  2: "Rojo",
+  3: "Verde",
+  4: "Morado",
+  5: "Naranja",
+};
+
+const getDefaultTeamName = (teamId: number) =>
+  TEAM_COLOR_NAMES[teamId] || "Equipo";
+
 const fallbackSetup: GameSetup = {
   timePerTurn: 30,
   wordsPerPlayer: 3,
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
+  teamOrder: [1, 2],
   teamNames: {
-    team1: "Azul",
-    team2: "Rojo",
+    "1": getDefaultTeamName(1),
+    "2": getDefaultTeamName(2),
   },
 };
 
@@ -108,18 +118,44 @@ export default function GameScreen() {
             ? parsed.rounds
             : [true, true, true, true],
         players: parsed.players,
-        teamNames: {
-          team1:
-            typeof parsed.teamNames?.team1 === "string" &&
-            parsed.teamNames.team1.trim().length > 0
-              ? parsed.teamNames.team1.trim()
-              : "Azul",
-          team2:
-            typeof parsed.teamNames?.team2 === "string" &&
-            parsed.teamNames.team2.trim().length > 0
-              ? parsed.teamNames.team2.trim()
-              : "Rojo",
-        },
+        teamOrder:
+          Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2
+            ? parsed.teamOrder
+                .map((value: unknown) => Number(value))
+                .filter(
+                  (value: number, index: number, all: number[]) =>
+                    Number.isInteger(value) &&
+                    value > 0 &&
+                    all.indexOf(value) === index,
+                )
+                .sort((a: number, b: number) => a - b)
+            : [1, 2],
+        teamNames:
+          parsed.teamNames && typeof parsed.teamNames === "object"
+            ? Object.entries(
+                parsed.teamNames as Record<string, unknown>,
+              ).reduce<Record<string, string>>((acc, [key, value]) => {
+                const numeric = Number(key);
+                if (
+                  Number.isInteger(numeric) &&
+                  numeric > 0 &&
+                  typeof value === "string"
+                ) {
+                  acc[String(numeric)] =
+                    value.trim() || getDefaultTeamName(numeric);
+                  return acc;
+                }
+
+                const match = key.match(/^team(\d+)$/i);
+                if (match && typeof value === "string") {
+                  const teamId = Number(match[1]);
+                  acc[String(teamId)] =
+                    value.trim() || getDefaultTeamName(teamId);
+                }
+
+                return acc;
+              }, {})
+            : { "1": getDefaultTeamName(1), "2": getDefaultTeamName(2) },
       };
     } catch {
       return fallbackSetup;
@@ -146,26 +182,61 @@ export default function GameScreen() {
     return indices.length > 0 ? indices : [1];
   }, [setup.rounds]);
 
-  const team1Players = useMemo(
-    () => setup.players.filter((player) => player.team === 1),
-    [setup.players],
+  const teamIds = useMemo<number[]>(() => {
+    const idsFromOrder = setup.teamOrder
+      .map((value) => Number(value))
+      .filter(
+        (value, index, all) =>
+          Number.isInteger(value) && value > 0 && all.indexOf(value) === index,
+      );
+
+    const idsFromPlayers = setup.players
+      .map((player) => Number(player.team))
+      .filter(
+        (value, index, all) =>
+          Number.isInteger(value) && value > 0 && all.indexOf(value) === index,
+      );
+
+    const merged = Array.from(
+      new Set([...idsFromOrder, ...idsFromPlayers]),
+    ).sort((a, b) => a - b);
+
+    return merged.length > 0 ? merged : [1, 2];
+  }, [setup.players, setup.teamOrder]);
+
+  const zeroScores = useMemo(
+    () =>
+      teamIds.reduce<Record<number, number>>((acc, teamId) => {
+        acc[teamId] = 0;
+        return acc;
+      }, {}),
+    [teamIds],
   );
-  const team2Players = useMemo(
-    () => setup.players.filter((player) => player.team === 2),
-    [setup.players],
+
+  const playersByTeam = useMemo(() => {
+    return setup.players.reduce<Record<number, PlayerConfig[]>>(
+      (acc, player) => {
+        if (!acc[player.team]) {
+          acc[player.team] = [];
+        }
+        acc[player.team].push(player);
+        return acc;
+      },
+      {},
+    );
+  }, [setup.players]);
+
+  const playableTeamIds = useMemo(
+    () => teamIds.filter((teamId) => (playersByTeam[teamId] || []).length > 0),
+    [playersByTeam, teamIds],
   );
 
   const [roundPosition, setRoundPosition] = useState(0);
-  const [currentTurnTeam, setCurrentTurnTeam] = useState<1 | 2>(
-    team1Players.length > 0 ? 1 : 2,
+  const [currentTurnTeam, setCurrentTurnTeam] = useState<number>(
+    playableTeamIds[0] || teamIds[0] || 1,
   );
-  const [teamPlayerTurnIndices, setTeamPlayerTurnIndices] = useState<{
-    1: number;
-    2: number;
-  }>({
-    1: 0,
-    2: 0,
-  });
+  const [teamPlayerTurnIndices, setTeamPlayerTurnIndices] =
+    useState<Record<number, number>>(zeroScores);
   const [queue, setQueue] = useState<string[]>(() => shuffle(allWords));
   const [currentWord, setCurrentWord] = useState<string | null>(null);
   const [turnActive, setTurnActive] = useState(false);
@@ -177,9 +248,12 @@ export default function GameScreen() {
   const [timeLeft, setTimeLeft] = useState(setup.timePerTurn);
   const [skipsLeft, setSkipsLeft] = useState<number | null>(setup.skipsPerTurn);
 
-  const [teamScores, setTeamScores] = useState({ team1: 0, team2: 0 });
-  const [roundScores, setRoundScores] = useState({ team1: 0, team2: 0 });
-  const [roundWins, setRoundWins] = useState({ team1: 0, team2: 0 });
+  const [teamScores, setTeamScores] =
+    useState<Record<number, number>>(zeroScores);
+  const [roundScores, setRoundScores] =
+    useState<Record<number, number>>(zeroScores);
+  const [roundWins, setRoundWins] =
+    useState<Record<number, number>>(zeroScores);
   const [playerScores, setPlayerScores] = useState<Record<string, number>>({});
   const [roundPlayerScores, setRoundPlayerScores] = useState<
     Record<number, Record<string, number>>
@@ -198,8 +272,7 @@ export default function GameScreen() {
     Partial<Record<keyof typeof SOUND_ASSETS, AudioPlayer>>
   >({});
 
-  const currentTeamPlayers =
-    currentTurnTeam === 1 ? team1Players : team2Players;
+  const currentTeamPlayers = playersByTeam[currentTurnTeam] || [];
   const currentTeamIndex = teamPlayerTurnIndices[currentTurnTeam];
   const currentPlayer =
     currentTeamPlayers.length > 0
@@ -215,16 +288,20 @@ export default function GameScreen() {
   const introRoundInstruction =
     ROUND_INSTRUCTIONS[introRoundNumber] ||
     "Adivina la mayor cantidad de palabras posible.";
-  const currentTeamRoundScore =
-    currentPlayer?.team === 2 ? roundScores.team2 : roundScores.team1;
+  const currentTeamRoundScore = currentPlayer
+    ? roundScores[currentPlayer.team] || 0
+    : 0;
   const isUrgentTime = timeLeft <= 10;
-  const team1Name = setup.teamNames.team1;
-  const team2Name = setup.teamNames.team2;
+  const getTeamName = (teamId: number) =>
+    setup.teamNames[String(teamId)] || getDefaultTeamName(teamId);
+  const scoreTableRows = teamIds.map((teamId) => ({
+    teamId,
+    name: getTeamName(teamId),
+    score: teamScores[teamId] || 0,
+    wins: roundWins[teamId] || 0,
+  }));
 
-  const goToFinalResults = (finalRoundWins: {
-    team1: number;
-    team2: number;
-  }) => {
+  const goToFinalResults = (finalRoundWins: Record<number, number>) => {
     if (finalNavigationDoneRef.current) {
       return;
     }
@@ -400,29 +477,43 @@ export default function GameScreen() {
   }, [gameFinished, navigation]);
 
   const advancePlayer = () => {
-    if (team1Players.length === 0 || team2Players.length === 0) return;
+    if (playableTeamIds.length === 0) return;
 
     setTeamPlayerTurnIndices((previous) => ({
       ...previous,
-      [currentTurnTeam]: previous[currentTurnTeam] + 1,
+      [currentTurnTeam]: (previous[currentTurnTeam] || 0) + 1,
     }));
-    setCurrentTurnTeam((previous) => (previous === 1 ? 2 : 1));
+
+    const currentIndex = playableTeamIds.indexOf(currentTurnTeam);
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextTeam = playableTeamIds[(safeIndex + 1) % playableTeamIds.length];
+    setCurrentTurnTeam(nextTeam);
   };
 
   const completeRound = () => {
     let message = `Fin de ronda ${currentRoundNumber}. `;
     let nextRoundWins = { ...roundWins };
 
-    if (roundScores.team1 > roundScores.team2) {
-      nextRoundWins = { ...roundWins, team1: roundWins.team1 + 1 };
-      setRoundWins(nextRoundWins);
-      message += `Gana ${team1Name}.`;
-    } else if (roundScores.team2 > roundScores.team1) {
-      nextRoundWins = { ...roundWins, team2: roundWins.team2 + 1 };
-      setRoundWins(nextRoundWins);
-      message += `Gana ${team2Name}.`;
-    } else {
+    const contenderTeams =
+      playableTeamIds.length > 0 ? playableTeamIds : teamIds;
+    const maxScore = Math.max(
+      ...contenderTeams.map((teamId) => roundScores[teamId] || 0),
+      0,
+    );
+    const roundWinners = contenderTeams.filter(
+      (teamId) => (roundScores[teamId] || 0) === maxScore,
+    );
+
+    if (maxScore === 0 || roundWinners.length > 1) {
       message += "Empate.";
+    } else {
+      const winnerTeamId = roundWinners[0];
+      nextRoundWins = {
+        ...roundWins,
+        [winnerTeamId]: (roundWins[winnerTeamId] || 0) + 1,
+      };
+      setRoundWins(nextRoundWins);
+      message += `Gana ${getTeamName(winnerTeamId)}.`;
     }
 
     const isLastRound = roundPosition >= enabledRounds.length - 1;
@@ -447,7 +538,7 @@ export default function GameScreen() {
     setRoundPosition(nextRoundPosition);
     setIntroRoundNumber(nextRoundNumber);
     setShowRoundIntro(true);
-    setRoundScores({ team1: 0, team2: 0 });
+    setRoundScores({ ...zeroScores });
     setQueue(shuffle(allWords));
     setTimeLeft(setup.timePerTurn);
     advancePlayer();
@@ -521,17 +612,15 @@ export default function GameScreen() {
 
     guessedThisTurnRef.current += 1;
 
-    setTeamScores((previous) =>
-      currentPlayer.team === 1
-        ? { ...previous, team1: previous.team1 + 1 }
-        : { ...previous, team2: previous.team2 + 1 },
-    );
+    setTeamScores((previous) => ({
+      ...previous,
+      [currentPlayer.team]: (previous[currentPlayer.team] || 0) + 1,
+    }));
 
-    setRoundScores((previous) =>
-      currentPlayer.team === 1
-        ? { ...previous, team1: previous.team1 + 1 }
-        : { ...previous, team2: previous.team2 + 1 },
-    );
+    setRoundScores((previous) => ({
+      ...previous,
+      [currentPlayer.team]: (previous[currentPlayer.team] || 0) + 1,
+    }));
 
     setPlayerScores((previous) => ({
       ...previous,
@@ -743,21 +832,32 @@ export default function GameScreen() {
           </View>
 
           <View style={styles.scoreboardCard}>
-            <View style={styles.teamScoreCard}>
-              <Text style={styles.teamScoreName}>{team1Name}</Text>
-              <Text style={styles.teamScoreValue}>{teamScores.team1}</Text>
-              <Text style={styles.teamScoreMeta}>
-                {roundWins.team1} rondas ganadas
+            <View style={styles.scoreTableHeaderRow}>
+              <Text
+                style={[
+                  styles.scoreTableHeaderText,
+                  styles.scoreTableTeamColumn,
+                ]}
+              >
+                Equipo
               </Text>
+              <Text style={styles.scoreTableHeaderText}>Aciertos</Text>
+              <Text style={styles.scoreTableHeaderText}>Rondas</Text>
             </View>
-            <View style={styles.teamScoreDivider} />
-            <View style={styles.teamScoreCard}>
-              <Text style={styles.teamScoreName}>{team2Name}</Text>
-              <Text style={styles.teamScoreValue}>{teamScores.team2}</Text>
-              <Text style={styles.teamScoreMeta}>
-                {roundWins.team2} rondas ganadas
-              </Text>
-            </View>
+            {scoreTableRows.map((row) => (
+              <View key={`score-${row.teamId}`} style={styles.scoreTableRow}>
+                <Text
+                  style={[
+                    styles.scoreTableTeamText,
+                    styles.scoreTableTeamColumn,
+                  ]}
+                >
+                  {row.name}
+                </Text>
+                <Text style={styles.scoreTableValueText}>{row.score}</Text>
+                <Text style={styles.scoreTableValueText}>{row.wins}</Text>
+              </View>
+            ))}
           </View>
 
           <MotiView
@@ -769,7 +869,7 @@ export default function GameScreen() {
             <Text style={styles.turnLabel}>Siguiente turno</Text>
             <Text style={styles.playerName}>{currentPlayer?.name || "-"}</Text>
             <Text style={styles.teamLabel}>
-              Equipo {currentPlayer?.team || "-"}
+              {currentPlayer ? getTeamName(currentPlayer.team) : "-"}
             </Text>
 
             {!gameFinished && (
@@ -796,7 +896,7 @@ export default function GameScreen() {
               .map((player) => (
                 <View key={player.id} style={styles.playerScoreRow}>
                   <Text style={styles.playerScoreLine}>
-                    {player.name} (E{player.team})
+                    {player.name} ({getTeamName(player.team)})
                   </Text>
                   <Text style={styles.playerScoreValue}>
                     {playerScores[player.id] || 0}
@@ -886,35 +986,49 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.78)",
     borderWidth: 1,
     borderColor: "#fed7aa",
-    padding: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 2,
+  },
+  scoreTableHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(154, 52, 18, 0.18)",
   },
-  teamScoreCard: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  teamScoreDivider: {
-    width: 1,
-    alignSelf: "stretch",
-    backgroundColor: "rgba(154, 52, 18, 0.22)",
-    marginHorizontal: 12,
-  },
-  teamScoreName: {
+  scoreTableHeaderText: {
     color: "#9a3412",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  teamScoreValue: {
-    color: "#111827",
     fontWeight: "800",
-    fontSize: 34,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    flex: 0.8,
+    textAlign: "center",
   },
-  teamScoreMeta: {
-    color: "#78350f",
-    fontSize: 13,
+  scoreTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(154, 52, 18, 0.1)",
+  },
+  scoreTableTeamColumn: {
+    flex: 1.8,
+    textAlign: "left",
+  },
+  scoreTableTeamText: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800",
+    paddingRight: 8,
+  },
+  scoreTableValueText: {
+    color: "#111827",
+    flex: 0.8,
+    textAlign: "center",
     fontWeight: "700",
+    fontSize: 15,
   },
   turnCard: {
     marginTop: 18,

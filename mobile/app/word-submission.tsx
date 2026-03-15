@@ -17,7 +17,7 @@ import { LoadingOverlay } from "../src/components/LoadingOverlay";
 interface PlayerConfig {
   id: string;
   name: string;
-  team: 1 | 2;
+  team: number;
 }
 
 interface GameSetup {
@@ -26,11 +26,20 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
-  teamNames: {
-    team1: string;
-    team2: string;
-  };
+  teamOrder: number[];
+  teamNames: Record<string, string>;
 }
+
+const TEAM_COLOR_NAMES: Record<number, string> = {
+  1: "Azul",
+  2: "Rojo",
+  3: "Verde",
+  4: "Morado",
+  5: "Naranja",
+};
+
+const getDefaultTeamName = (teamId: number) =>
+  TEAM_COLOR_NAMES[teamId] || "Equipo";
 
 const defaultSetup: GameSetup = {
   timePerTurn: 30,
@@ -38,9 +47,10 @@ const defaultSetup: GameSetup = {
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
+  teamOrder: [1, 2],
   teamNames: {
-    team1: "Azul",
-    team2: "Rojo",
+    "1": getDefaultTeamName(1),
+    "2": getDefaultTeamName(2),
   },
 };
 
@@ -71,18 +81,37 @@ export default function WordSubmissionScreen() {
             ? parsed.rounds
             : [true, true, true, true],
         players: parsed.players,
-        teamNames: {
-          team1:
-            typeof parsed.teamNames?.team1 === "string" &&
-            parsed.teamNames.team1.trim().length > 0
-              ? parsed.teamNames.team1.trim()
-              : "Azul",
-          team2:
-            typeof parsed.teamNames?.team2 === "string" &&
-            parsed.teamNames.team2.trim().length > 0
-              ? parsed.teamNames.team2.trim()
-              : "Rojo",
-        },
+        teamOrder:
+          Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2
+            ? parsed.teamOrder
+                .map((value: unknown) => Number(value))
+                .filter((value: number) => Number.isInteger(value) && value > 0)
+            : [1, 2],
+        teamNames:
+          parsed.teamNames && typeof parsed.teamNames === "object"
+            ? Object.entries(
+                parsed.teamNames as Record<string, unknown>,
+              ).reduce<Record<string, string>>((acc, [key, value]) => {
+                const numeric = Number(key);
+                if (
+                  Number.isInteger(numeric) &&
+                  numeric > 0 &&
+                  typeof value === "string"
+                ) {
+                  acc[String(numeric)] =
+                    value.trim() || getDefaultTeamName(numeric);
+                  return acc;
+                }
+
+                const match = key.match(/^team(\d+)$/i);
+                if (match && typeof value === "string") {
+                  const teamId = Number(match[1]);
+                  acc[String(teamId)] =
+                    value.trim() || getDefaultTeamName(teamId);
+                }
+                return acc;
+              }, {})
+            : { "1": getDefaultTeamName(1), "2": getDefaultTeamName(2) },
       };
     } catch {
       return defaultSetup;
@@ -186,9 +215,8 @@ export default function WordSubmissionScreen() {
             <Text style={styles.handoffTitle}>Pasa el dispositivo a:</Text>
             <Text style={styles.playerName}>{currentPlayer.name}</Text>
             <Text style={styles.playerTeam}>
-              {currentPlayer.team === 1
-                ? setup.teamNames.team1
-                : setup.teamNames.team2}
+              {setup.teamNames[String(currentPlayer.team)] ||
+                getDefaultTeamName(currentPlayer.team)}
             </Text>
             <Button
               title="Ya lo tiene"

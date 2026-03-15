@@ -8,7 +8,7 @@ import { Button } from "../src/components/Button";
 interface PlayerConfig {
   id: string;
   name: string;
-  team: 1 | 2;
+  team: number;
 }
 
 interface GameSetup {
@@ -17,15 +17,13 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
-  teamNames: {
-    team1: string;
-    team2: string;
-  };
+  teamOrder: number[];
+  teamNames: Record<string, string>;
 }
 
 interface FinalStats {
-  teamScores: { team1: number; team2: number };
-  roundWins: { team1: number; team2: number };
+  teamScores: Record<number, number>;
+  roundWins: Record<number, number>;
   playerScores: Record<string, number>;
   roundPlayerScores: Record<number, Record<string, number>>;
   enabledRounds: number[];
@@ -38,21 +36,33 @@ const ROUND_META = [
   { id: 4, name: "Sonidos" },
 ];
 
+const TEAM_COLOR_NAMES: Record<number, string> = {
+  1: "Azul",
+  2: "Rojo",
+  3: "Verde",
+  4: "Morado",
+  5: "Naranja",
+};
+
+const getDefaultTeamName = (teamId: number) =>
+  TEAM_COLOR_NAMES[teamId] || "Equipo";
+
 const fallbackSetup: GameSetup = {
   timePerTurn: 30,
   wordsPerPlayer: 3,
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
+  teamOrder: [1, 2],
   teamNames: {
-    team1: "Azul",
-    team2: "Rojo",
+    "1": getDefaultTeamName(1),
+    "2": getDefaultTeamName(2),
   },
 };
 
 const fallbackStats: FinalStats = {
-  teamScores: { team1: 0, team2: 0 },
-  roundWins: { team1: 0, team2: 0 },
+  teamScores: { 1: 0, 2: 0 },
+  roundWins: { 1: 0, 2: 0 },
   playerScores: {},
   roundPlayerScores: {},
   enabledRounds: [1],
@@ -88,18 +98,29 @@ export default function FinalResultsScreen() {
             ? parsed.rounds
             : [true, true, true, true],
         players: parsed.players,
-        teamNames: {
-          team1:
-            typeof parsed.teamNames?.team1 === "string" &&
-            parsed.teamNames.team1.trim().length > 0
-              ? parsed.teamNames.team1.trim()
-              : "Azul",
-          team2:
-            typeof parsed.teamNames?.team2 === "string" &&
-            parsed.teamNames.team2.trim().length > 0
-              ? parsed.teamNames.team2.trim()
-              : "Rojo",
-        },
+        teamOrder:
+          Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2
+            ? parsed.teamOrder
+                .map((value: unknown) => Number(value))
+                .filter((value: number) => Number.isInteger(value) && value > 0)
+            : [1, 2],
+        teamNames:
+          parsed.teamNames && typeof parsed.teamNames === "object"
+            ? Object.entries(
+                parsed.teamNames as Record<string, unknown>,
+              ).reduce<Record<string, string>>((acc, [key, value]) => {
+                const numeric = Number(key);
+                if (
+                  Number.isInteger(numeric) &&
+                  numeric > 0 &&
+                  typeof value === "string"
+                ) {
+                  acc[String(numeric)] =
+                    value.trim() || getDefaultTeamName(numeric);
+                }
+                return acc;
+              }, {})
+            : { "1": getDefaultTeamName(1), "2": getDefaultTeamName(2) },
       };
     } catch {
       return fallbackSetup;
@@ -113,16 +134,35 @@ export default function FinalResultsScreen() {
     }
 
     try {
+      const parseTeamScores = (value: unknown): Record<number, number> => {
+        if (!value || typeof value !== "object") {
+          return { 1: 0, 2: 0 };
+        }
+
+        const input = value as Record<string, unknown>;
+        const output: Record<number, number> = {};
+
+        Object.entries(input).forEach(([key, raw]) => {
+          const numericKey = Number(key);
+          if (Number.isInteger(numericKey) && numericKey > 0) {
+            output[numericKey] = Number(raw) || 0;
+            return;
+          }
+
+          const match = key.match(/^team(\d+)$/i);
+          if (match) {
+            const teamId = Number(match[1]);
+            output[teamId] = Number(raw) || 0;
+          }
+        });
+
+        return Object.keys(output).length > 0 ? output : { 1: 0, 2: 0 };
+      };
+
       const parsed = JSON.parse(raw);
       return {
-        teamScores: {
-          team1: Number(parsed?.teamScores?.team1) || 0,
-          team2: Number(parsed?.teamScores?.team2) || 0,
-        },
-        roundWins: {
-          team1: Number(parsed?.roundWins?.team1) || 0,
-          team2: Number(parsed?.roundWins?.team2) || 0,
-        },
+        teamScores: parseTeamScores(parsed?.teamScores),
+        roundWins: parseTeamScores(parsed?.roundWins),
         playerScores:
           parsed?.playerScores && typeof parsed.playerScores === "object"
             ? parsed.playerScores
@@ -143,29 +183,48 @@ export default function FinalResultsScreen() {
     }
   }, [params.stats]);
 
-  const winnerTeam: 1 | 2 | null =
-    stats.roundWins.team1 === stats.roundWins.team2
-      ? stats.teamScores.team1 === stats.teamScores.team2
-        ? null
-        : stats.teamScores.team1 > stats.teamScores.team2
-          ? 1
-          : 2
-      : stats.roundWins.team1 > stats.roundWins.team2
-        ? 1
-        : 2;
+  const teamIds = useMemo(() => {
+    const idsFromOrder = setup.teamOrder;
+    const idsFromPlayers = setup.players.map((player) => player.team);
+    const idsFromScores = [
+      ...Object.keys(stats.teamScores).map((value) => Number(value)),
+      ...Object.keys(stats.roundWins).map((value) => Number(value)),
+    ];
+
+    const merged = Array.from(
+      new Set([...idsFromOrder, ...idsFromPlayers, ...idsFromScores]),
+    )
+      .filter((value) => Number.isInteger(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    return merged.length > 0 ? merged : [1, 2];
+  }, [setup.players, setup.teamOrder, stats.roundWins, stats.teamScores]);
+
+  const getTeamName = (teamId: number) =>
+    setup.teamNames[String(teamId)] || getDefaultTeamName(teamId);
+
+  const maxRoundWins = Math.max(
+    ...teamIds.map((teamId) => stats.roundWins[teamId] || 0),
+    0,
+  );
+  const teamsWithMaxRoundWins = teamIds.filter(
+    (teamId) => (stats.roundWins[teamId] || 0) === maxRoundWins,
+  );
+  const maxScoreAmongTied = Math.max(
+    ...teamsWithMaxRoundWins.map((teamId) => stats.teamScores[teamId] || 0),
+    0,
+  );
+  const winnerTeams = teamsWithMaxRoundWins.filter(
+    (teamId) => (stats.teamScores[teamId] || 0) === maxScoreAmongTied,
+  );
 
   const usedScoreTiebreak =
-    stats.roundWins.team1 === stats.roundWins.team2 &&
-    stats.teamScores.team1 !== stats.teamScores.team2;
-  const team1Name = setup.teamNames.team1;
-  const team2Name = setup.teamNames.team2;
+    teamsWithMaxRoundWins.length > 1 && winnerTeams.length === 1;
 
   const winnerPlayers =
-    winnerTeam === 1
-      ? setup.players.filter((player) => player.team === 1)
-      : winnerTeam === 2
-        ? setup.players.filter((player) => player.team === 2)
-        : [];
+    winnerTeams.length === 1
+      ? setup.players.filter((player) => player.team === winnerTeams[0])
+      : [];
 
   const goToTeamsWithSameSetup = () => {
     router.replace({
@@ -178,6 +237,7 @@ export default function FinalResultsScreen() {
           skipsPerTurn: setup.skipsPerTurn,
           rounds: setup.rounds,
           teamNames: setup.teamNames,
+          teamOrder: setup.teamOrder,
         }),
       },
     });
@@ -199,19 +259,13 @@ export default function FinalResultsScreen() {
         >
           <Text style={styles.heroKicker}>Resultado final</Text>
           <Text style={styles.heroTitle}>
-            {winnerTeam
-              ? winnerTeam === 1
-                ? `${team1Name} gana`
-                : `${team2Name} gana`
+            {winnerTeams.length === 1
+              ? `${getTeamName(winnerTeams[0])} gana`
               : "Empate"}
           </Text>
           <Text style={styles.heroSubtitle}>
-            {winnerTeam
-              ? `Rondas ganadas: ${
-                  winnerTeam === 1
-                    ? stats.roundWins.team1
-                    : stats.roundWins.team2
-                }${
+            {winnerTeams.length === 1
+              ? `Rondas ganadas: ${stats.roundWins[winnerTeams[0]] || 0}${
                   usedScoreTiebreak ? " · Desempate por total de aciertos" : ""
                 }`
               : "Empate en rondas y en total de aciertos"}
@@ -241,24 +295,17 @@ export default function FinalResultsScreen() {
         <View style={styles.statsCard}>
           <Text style={styles.sectionTitle}>Estadisticas por equipo</Text>
           <View style={styles.teamRow}>
-            <View style={styles.teamBox}>
-              <Text style={styles.teamName}>{team1Name}</Text>
-              <Text style={styles.teamMetric}>
-                Aciertos: {stats.teamScores.team1}
-              </Text>
-              <Text style={styles.teamMetric}>
-                Rondas: {stats.roundWins.team1}
-              </Text>
-            </View>
-            <View style={styles.teamBox}>
-              <Text style={styles.teamName}>{team2Name}</Text>
-              <Text style={styles.teamMetric}>
-                Aciertos: {stats.teamScores.team2}
-              </Text>
-              <Text style={styles.teamMetric}>
-                Rondas: {stats.roundWins.team2}
-              </Text>
-            </View>
+            {teamIds.map((teamId) => (
+              <View key={`team-box-${teamId}`} style={styles.teamBox}>
+                <Text style={styles.teamName}>{getTeamName(teamId)}</Text>
+                <Text style={styles.teamMetric}>
+                  Aciertos: {stats.teamScores[teamId] || 0}
+                </Text>
+                <Text style={styles.teamMetric}>
+                  Rondas: {stats.roundWins[teamId] || 0}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -269,18 +316,12 @@ export default function FinalResultsScreen() {
               ROUND_META.find((round) => round.id === roundId)?.name ||
               `Ronda ${roundId}`;
             const roundData = stats.roundPlayerScores[roundId] || {};
-            const team1Round = setup.players
-              .filter((player) => player.team === 1)
-              .reduce(
-                (total, player) => total + (roundData[player.id] || 0),
-                0,
-              );
-            const team2Round = setup.players
-              .filter((player) => player.team === 2)
-              .reduce(
-                (total, player) => total + (roundData[player.id] || 0),
-                0,
-              );
+            const roundTotals = teamIds.map((teamId) => {
+              const total = setup.players
+                .filter((player) => player.team === teamId)
+                .reduce((sum, player) => sum + (roundData[player.id] || 0), 0);
+              return `${getTeamName(teamId)}: ${total}`;
+            });
 
             return (
               <View key={`round-${roundId}`} style={styles.roundCard}>
@@ -288,7 +329,7 @@ export default function FinalResultsScreen() {
                   Ronda {roundId}: {roundName}
                 </Text>
                 <Text style={styles.roundTeamTotals}>
-                  {team1Name}: {team1Round} · {team2Name}: {team2Round}
+                  {roundTotals.join(" · ")}
                 </Text>
 
                 {setup.players.map((player) => (
@@ -297,7 +338,7 @@ export default function FinalResultsScreen() {
                     style={styles.playerRow}
                   >
                     <Text style={styles.playerLabel}>
-                      {player.name} (E{player.team})
+                      {player.name} ({getTeamName(player.team)})
                     </Text>
                     <Text style={styles.playerValue}>
                       {roundData[player.id] || 0}
@@ -321,7 +362,7 @@ export default function FinalResultsScreen() {
             .map((player) => (
               <View key={`total-${player.id}`} style={styles.playerRow}>
                 <Text style={styles.playerLabel}>
-                  {player.name} (E{player.team})
+                  {player.name} ({getTeamName(player.team)})
                 </Text>
                 <Text style={styles.playerValue}>
                   {stats.playerScores[player.id] || 0}
@@ -415,10 +456,11 @@ const styles = StyleSheet.create({
   },
   teamRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
   teamBox: {
-    flex: 1,
+    minWidth: "47%",
     borderRadius: 14,
     padding: 10,
     backgroundColor: "rgba(251, 191, 36, 0.12)",
