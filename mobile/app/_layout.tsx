@@ -16,6 +16,10 @@ export default function RootLayout() {
           name="game"
           options={{ title: "Jugando", headerShown: false }}
         />
+        <Stack.Screen
+          name="final-results"
+          options={{ title: "Resultado", headerShown: false }}
+        />
       </Stack>
     </GestureHandlerRootView>
   );

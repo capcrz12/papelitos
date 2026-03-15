@@ -49,15 +49,16 @@ const fallbackSetup: GameSetup = {
   players: [],
 };
 
-const formatSkipsRemaining = (value: number | null) =>
-  value === null ? "∞" : String(value);
-
 const SOUND_ASSETS = {
   start: require("../assets/sounds/start.mp3"),
   success: require("../assets/sounds/success.mp3"),
   clock: require("../assets/sounds/clock.mp3"),
   skip: require("../assets/sounds/skip.mp3"),
-} satisfies Record<"start" | "success" | "clock" | "skip", AVPlaybackSource>;
+  ends: require("../assets/sounds/ends.mp3"),
+} satisfies Record<
+  "start" | "success" | "clock" | "skip" | "ends",
+  AVPlaybackSource
+>;
 
 const shuffle = (values: string[]) => {
   const copy = [...values];
@@ -155,12 +156,16 @@ export default function GameScreen() {
   const [roundScores, setRoundScores] = useState({ team1: 0, team2: 0 });
   const [roundWins, setRoundWins] = useState({ team1: 0, team2: 0 });
   const [playerScores, setPlayerScores] = useState<Record<string, number>>({});
+  const [roundPlayerScores, setRoundPlayerScores] = useState<
+    Record<number, Record<string, number>>
+  >({});
   const [turnSummary, setTurnSummary] = useState("");
   const [gameFinished, setGameFinished] = useState(false);
 
   const guessedThisTurnRef = useRef(0);
   const clockAlertPlayedRef = useRef(false);
   const allowExitRef = useRef(false);
+  const finalNavigationDoneRef = useRef(false);
   const soundEffectsRef = useRef<
     Partial<Record<keyof typeof SOUND_ASSETS, Audio.Sound>>
   >({});
@@ -186,6 +191,32 @@ export default function GameScreen() {
     currentPlayer?.team === 2 ? roundScores.team2 : roundScores.team1;
   const isUrgentTime = timeLeft <= 10;
 
+  const goToFinalResults = (finalRoundWins: {
+    team1: number;
+    team2: number;
+  }) => {
+    if (finalNavigationDoneRef.current) {
+      return;
+    }
+
+    finalNavigationDoneRef.current = true;
+    allowExitRef.current = true;
+
+    router.replace({
+      pathname: "/final-results",
+      params: {
+        setup: JSON.stringify(setup),
+        stats: JSON.stringify({
+          teamScores,
+          roundWins: finalRoundWins,
+          playerScores,
+          roundPlayerScores,
+          enabledRounds,
+        }),
+      },
+    });
+  };
+
   useEffect(() => {
     if (!turnActive) return;
 
@@ -193,7 +224,7 @@ export default function GameScreen() {
       setTimeLeft((previous) => {
         if (previous <= 1) {
           clearInterval(timer);
-          endTurn();
+          endTurn("timeout");
           return 0;
         }
         return previous - 1;
@@ -358,12 +389,15 @@ export default function GameScreen() {
 
   const completeRound = () => {
     let message = `Fin de ronda ${currentRoundNumber}. `;
+    let nextRoundWins = { ...roundWins };
 
     if (roundScores.team1 > roundScores.team2) {
-      setRoundWins((previous) => ({ ...previous, team1: previous.team1 + 1 }));
+      nextRoundWins = { ...roundWins, team1: roundWins.team1 + 1 };
+      setRoundWins(nextRoundWins);
       message += "Gana Equipo 1.";
     } else if (roundScores.team2 > roundScores.team1) {
-      setRoundWins((previous) => ({ ...previous, team2: previous.team2 + 1 }));
+      nextRoundWins = { ...roundWins, team2: roundWins.team2 + 1 };
+      setRoundWins(nextRoundWins);
       message += "Gana Equipo 2.";
     } else {
       message += "Empate.";
@@ -380,6 +414,7 @@ export default function GameScreen() {
 
     if (isLastRound) {
       setGameFinished(true);
+      goToFinalResults(nextRoundWins);
       return;
     }
 
@@ -394,9 +429,13 @@ export default function GameScreen() {
     advancePlayer();
   };
 
-  const endTurn = () => {
+  const endTurn = (reason: "timeout" | "manual" = "manual") => {
     if (!turnActive && !gameFinished) {
       return;
+    }
+
+    if (reason === "timeout") {
+      void playSoundEffect("ends");
     }
 
     const guessed = guessedThisTurnRef.current;
@@ -467,6 +506,15 @@ export default function GameScreen() {
     setPlayerScores((previous) => ({
       ...previous,
       [currentPlayer.id]: (previous[currentPlayer.id] || 0) + 1,
+    }));
+
+    setRoundPlayerScores((previous) => ({
+      ...previous,
+      [currentRoundNumber]: {
+        ...(previous[currentRoundNumber] || {}),
+        [currentPlayer.id]:
+          ((previous[currentRoundNumber] || {})[currentPlayer.id] || 0) + 1,
+      },
     }));
 
     const nextQueue = queue.slice(1);
@@ -638,7 +686,7 @@ export default function GameScreen() {
               disabled={skipButtonDisabled}
             >
               <Text style={styles.actionButtonText}>
-                Pasar ({formatSkipsRemaining(skipsLeft)})
+                {skipsLeft === null ? "Pasar" : `Pasar (${skipsLeft})`}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -726,25 +774,6 @@ export default function GameScreen() {
                 </View>
               ))}
           </ScrollView>
-
-          {gameFinished && (
-            <View style={styles.finishedCard}>
-              <Text style={styles.finishedTitle}>Partida terminada</Text>
-              <Text style={styles.finishedSubtitle}>
-                {roundWins.team1 === roundWins.team2
-                  ? "Empate final"
-                  : roundWins.team1 > roundWins.team2
-                    ? "Gana Equipo 1"
-                    : "Gana Equipo 2"}
-              </Text>
-              <Button
-                title="Nueva partida"
-                onPress={() => router.replace("/")}
-                variant="primary"
-                size="large"
-              />
-            </View>
-          )}
 
           <View style={styles.footer}>
             <TouchableOpacity onPress={returnToStart}>
@@ -1164,6 +1193,82 @@ const styles = StyleSheet.create({
     color: "#78350f",
     textAlign: "center",
     fontWeight: "700",
+  },
+  winnerWrap: {
+    marginTop: 10,
+    gap: 12,
+  },
+  winnerBadge: {
+    backgroundColor: "#fde68a",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+    alignItems: "center",
+  },
+  winnerBadgeText: {
+    color: "#78350f",
+    fontWeight: "900",
+    fontSize: 16,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  winnerNamesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+  },
+  winnerNameChip: {
+    backgroundColor: "rgba(251, 191, 36, 0.24)",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "rgba(180, 83, 9, 0.35)",
+  },
+  winnerNameText: {
+    color: "#78350f",
+    fontWeight: "700",
+  },
+  roundStatsWrap: {
+    marginTop: 10,
+    gap: 10,
+  },
+  roundStatsTitle: {
+    color: "#78350f",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  roundStatsCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  roundStatsCardTitle: {
+    color: "#92400e",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  roundStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 3,
+  },
+  roundStatsPlayer: {
+    color: "#78350f",
+    fontWeight: "600",
+    flexShrink: 1,
+    paddingRight: 8,
+  },
+  roundStatsValue: {
+    color: "#451a03",
+    fontWeight: "800",
+    fontSize: 16,
   },
   footer: {
     marginTop: 14,

@@ -98,7 +98,7 @@ export default function ConfigScreen() {
   );
   const [rounds, setRounds] = useState<boolean[]>(currentSettings.rounds);
 
-  const timeOptions = [30, 45, 60, 90, 120];
+  const timeOptions = [20, 25, 30, 45, 60];
   const wordsOptions = [2, 3, 4, 5, 6];
 
   const toggleRound = (index: number) => {

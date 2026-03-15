@@ -60,29 +60,76 @@ interface DraggablePlayerChipProps {
   player: PlayerConfig;
   onDrop: (playerId: string, x: number, y: number) => void;
   onRemove: (id: string) => void;
+  onDragStateChange: (
+    playerId: string,
+    team: Team,
+    isDragging: boolean,
+  ) => void;
+  onHoverTeamChange: (team: Team | null) => void;
+  dropZones: Partial<Record<Team, DropZone>>;
 }
 
 function DraggablePlayerChip({
   player,
   onDrop,
   onRemove,
+  onDragStateChange,
+  onHoverTeamChange,
+  dropZones,
 }: DraggablePlayerChipProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const shadowOpacity = useSharedValue(0.08);
+  const hoveredTeam = useSharedValue<0 | Team>(0);
 
   const panGesture = Gesture.Pan()
     .minDistance(2)
     .onBegin(() => {
+      runOnJS(onDragStateChange)(player.id, player.team, true);
       scale.value = withSpring(1.06);
       shadowOpacity.value = withTiming(0.22, { duration: 160 });
     })
     .onUpdate((event) => {
       translateX.value = event.translationX;
       translateY.value = event.translationY;
+
+      const teamOneZone = dropZones[1];
+      const teamTwoZone = dropZones[2];
+      let nextHoveredTeam: 0 | Team = 0;
+
+      if (
+        teamOneZone &&
+        event.absoluteX >= teamOneZone.x &&
+        event.absoluteX <= teamOneZone.x + teamOneZone.width &&
+        event.absoluteY >= teamOneZone.y &&
+        event.absoluteY <= teamOneZone.y + teamOneZone.height
+      ) {
+        nextHoveredTeam = 1;
+      } else if (
+        teamTwoZone &&
+        event.absoluteX >= teamTwoZone.x &&
+        event.absoluteX <= teamTwoZone.x + teamTwoZone.width &&
+        event.absoluteY >= teamTwoZone.y &&
+        event.absoluteY <= teamTwoZone.y + teamTwoZone.height
+      ) {
+        nextHoveredTeam = 2;
+      }
+
+      if (hoveredTeam.value !== nextHoveredTeam) {
+        hoveredTeam.value = nextHoveredTeam;
+        runOnJS(onHoverTeamChange)(
+          nextHoveredTeam === 0 ? null : nextHoveredTeam,
+        );
+      }
     })
     .onFinalize((event) => {
+      if (hoveredTeam.value !== 0) {
+        hoveredTeam.value = 0;
+        runOnJS(onHoverTeamChange)(null);
+      }
+
+      runOnJS(onDragStateChange)(player.id, player.team, false);
       scale.value = withSpring(1);
       shadowOpacity.value = withTiming(0.08, { duration: 160 });
       translateX.value = withSpring(0, { damping: 12, stiffness: 190 });
@@ -98,6 +145,7 @@ function DraggablePlayerChip({
     ],
     shadowOpacity: shadowOpacity.value,
     zIndex: scale.value > 1 ? 20 : 1,
+    elevation: scale.value > 1 ? 16 : 2,
   }));
 
   return (
@@ -178,13 +226,14 @@ export default function TeamsScreen() {
   const [activeTeam, setActiveTeam] = useState<Team>(1);
   const [settings] = useState<MatchSettings>(initialSettings);
   const [isStartingMatch, setIsStartingMatch] = useState(false);
+  const [draggingTeam, setDraggingTeam] = useState<Team | null>(null);
+  const [hoveredDropTeam, setHoveredDropTeam] = useState<Team | null>(null);
   const [dropZones, setDropZones] = useState<Partial<Record<Team, DropZone>>>(
     {},
   );
 
   const teamOneRef = useRef<View>(null);
   const teamTwoRef = useRef<View>(null);
-  const gearSpin = useRef(new Animated.Value(0)).current;
   const ctaPulse = useRef(new Animated.Value(1)).current;
 
   const team1Players = useMemo(
@@ -266,6 +315,22 @@ export default function TeamsScreen() {
     );
   };
 
+  const handleDragStateChange = (
+    _playerId: string,
+    team: Team,
+    isDragging: boolean,
+  ) => {
+    setDraggingTeam(isDragging ? team : null);
+
+    if (!isDragging) {
+      setHoveredDropTeam(null);
+    }
+  };
+
+  const handleHoverTeamChange = (team: Team | null) => {
+    setHoveredDropTeam((prev) => (prev === team ? prev : team));
+  };
+
   const handleDropPlayer = (playerId: string, x: number, y: number) => {
     if (pointInsideZone(dropZones[1], x, y)) {
       movePlayerToTeam(playerId, 1);
@@ -276,17 +341,6 @@ export default function TeamsScreen() {
       movePlayerToTeam(playerId, 2);
     }
   };
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(gearSpin, {
-        toValue: 1,
-        duration: 6000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    ).start();
-  }, [gearSpin]);
 
   useEffect(() => {
     Animated.loop(
@@ -312,18 +366,10 @@ export default function TeamsScreen() {
   }, [players.length]);
 
   const startMatch = () => {
-    if (players.length < 2) {
+    if (team1Players.length < 2 || team2Players.length < 2) {
       Alert.alert(
         "Jugadores insuficientes",
-        "Necesitas al menos 2 jugadores para empezar.",
-      );
-      return;
-    }
-
-    if (team1Players.length === 0 || team2Players.length === 0) {
-      Alert.alert(
-        "Equipos incompletos",
-        "Debe haber al menos un jugador en cada equipo.",
+        "Cada equipo necesita al menos 2 jugadores para empezar (4 en total).",
       );
       return;
     }
@@ -363,18 +409,7 @@ export default function TeamsScreen() {
               })
             }
           >
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: gearSpin.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0deg", "360deg"],
-                    }),
-                  },
-                ],
-              }}
-            >
+            <Animated.View>
               <Ionicons name="options-outline" size={20} color="#0f172a" />
             </Animated.View>
           </TouchableOpacity>
@@ -421,12 +456,28 @@ export default function TeamsScreen() {
       >
         <MotiView
           from={{ opacity: 0, translateY: 14 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: "timing", duration: 400 }}
+          animate={{
+            opacity: 1,
+            translateY: hoveredDropTeam === 1 ? -4 : 0,
+            scale: hoveredDropTeam === 1 ? 1.02 : 1,
+          }}
+          transition={{
+            type: "timing",
+            duration: hoveredDropTeam === 1 ? 160 : 220,
+          }}
+          style={[
+            draggingTeam === 1 && styles.draggingTeamLayer,
+            hoveredDropTeam === 1 && styles.dropReadyTeamLayer,
+          ]}
         >
           <Pressable
             ref={teamOneRef}
-            style={[styles.teamCard, styles.teamCardBlue]}
+            style={[
+              styles.teamCard,
+              styles.teamCardBlue,
+              draggingTeam === 1 && styles.activeTeamCard,
+              hoveredDropTeam === 1 && styles.dropReadyTeamCard,
+            ]}
             onPress={() => setActiveTeam(1)}
             onLayout={handleTeamCardLayout}
           >
@@ -434,13 +485,33 @@ export default function TeamsScreen() {
             <Text style={styles.teamCounter}>
               {team1Players.length} jugadores
             </Text>
-            <View style={styles.chipsWrap}>
+            {hoveredDropTeam === 1 && (
+              <MotiView
+                from={{ opacity: 0, scale: 0.92, translateY: -6 }}
+                animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                transition={{ type: "timing", duration: 160 }}
+                style={[styles.dropHintBadge, styles.dropHintBadgeBlue]}
+              >
+                <Text style={[styles.dropHintText, styles.dropHintTextBlue]}>
+                  Suelta aqui
+                </Text>
+              </MotiView>
+            )}
+            <View
+              style={[
+                styles.chipsWrap,
+                draggingTeam === 1 && styles.activeChipsWrap,
+              ]}
+            >
               {team1Players.map((player) => (
                 <DraggablePlayerChip
                   key={player.id}
                   player={player}
                   onDrop={handleDropPlayer}
                   onRemove={removePlayer}
+                  onDragStateChange={handleDragStateChange}
+                  onHoverTeamChange={handleHoverTeamChange}
+                  dropZones={dropZones}
                 />
               ))}
             </View>
@@ -452,12 +523,29 @@ export default function TeamsScreen() {
 
         <MotiView
           from={{ opacity: 0, translateY: 14 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: "timing", duration: 460, delay: 60 }}
+          animate={{
+            opacity: 1,
+            translateY: hoveredDropTeam === 2 ? -4 : 0,
+            scale: hoveredDropTeam === 2 ? 1.02 : 1,
+          }}
+          transition={{
+            type: "timing",
+            duration: hoveredDropTeam === 2 ? 160 : 220,
+            delay: 60,
+          }}
+          style={[
+            draggingTeam === 2 && styles.draggingTeamLayer,
+            hoveredDropTeam === 2 && styles.dropReadyTeamLayer,
+          ]}
         >
           <Pressable
             ref={teamTwoRef}
-            style={[styles.teamCard, styles.teamCardRed]}
+            style={[
+              styles.teamCard,
+              styles.teamCardRed,
+              draggingTeam === 2 && styles.activeTeamCard,
+              hoveredDropTeam === 2 && styles.dropReadyTeamCard,
+            ]}
             onPress={() => setActiveTeam(2)}
             onLayout={handleTeamCardLayout}
           >
@@ -465,13 +553,33 @@ export default function TeamsScreen() {
             <Text style={styles.teamCounter}>
               {team2Players.length} jugadores
             </Text>
-            <View style={styles.chipsWrap}>
+            {hoveredDropTeam === 2 && (
+              <MotiView
+                from={{ opacity: 0, scale: 0.92, translateY: -6 }}
+                animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                transition={{ type: "timing", duration: 160 }}
+                style={[styles.dropHintBadge, styles.dropHintBadgeRed]}
+              >
+                <Text style={[styles.dropHintText, styles.dropHintTextRed]}>
+                  Suelta aqui
+                </Text>
+              </MotiView>
+            )}
+            <View
+              style={[
+                styles.chipsWrap,
+                draggingTeam === 2 && styles.activeChipsWrap,
+              ]}
+            >
               {team2Players.map((player) => (
                 <DraggablePlayerChip
                   key={player.id}
                   player={player}
                   onDrop={handleDropPlayer}
                   onRemove={removePlayer}
+                  onDragStateChange={handleDragStateChange}
+                  onHoverTeamChange={handleHoverTeamChange}
+                  dropZones={dropZones}
                 />
               ))}
             </View>
@@ -607,6 +715,8 @@ const styles = StyleSheet.create({
   teamCard: {
     borderRadius: 16,
     padding: 14,
+    position: "relative",
+    overflow: "visible",
   },
   teamCardBlue: {
     backgroundColor: "#eff6ff",
@@ -634,6 +744,8 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 4,
+    position: "relative",
+    overflow: "visible",
   },
   playerChip: {
     backgroundColor: "white",
@@ -651,6 +763,7 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 9,
     gap: 8,
+    position: "relative",
   },
   playerChipRemoveButton: {
     width: 20,
@@ -672,6 +785,57 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#64748b",
     fontStyle: "italic",
+  },
+  draggingTeamLayer: {
+    zIndex: 40,
+    elevation: 20,
+  },
+  activeTeamCard: {
+    zIndex: 40,
+    elevation: 20,
+  },
+  dropReadyTeamLayer: {
+    zIndex: 45,
+    elevation: 24,
+  },
+  dropReadyTeamCard: {
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 24,
+  },
+  activeChipsWrap: {
+    zIndex: 50,
+    elevation: 24,
+  },
+  dropHintBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  dropHintBadgeBlue: {
+    backgroundColor: "#dbeafe",
+    borderColor: "#93c5fd",
+  },
+  dropHintBadgeRed: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#fca5a5",
+  },
+  dropHintText: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  dropHintTextBlue: {
+    color: "#1d4ed8",
+  },
+  dropHintTextRed: {
+    color: "#dc2626",
   },
   footer: {
     backgroundColor: "white",
