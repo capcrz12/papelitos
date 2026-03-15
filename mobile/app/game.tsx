@@ -8,7 +8,12 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { Audio, type AVPlaybackSource } from "expo-av";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
+  type AudioSource,
+} from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { AnimatePresence, MotiView } from "moti";
 import { Button } from "../src/components/Button";
@@ -25,6 +30,10 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
+  teamNames: {
+    team1: string;
+    team2: string;
+  };
 }
 
 const ROUND_META = [
@@ -47,6 +56,10 @@ const fallbackSetup: GameSetup = {
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
+  teamNames: {
+    team1: "Azul",
+    team2: "Rojo",
+  },
 };
 
 const SOUND_ASSETS = {
@@ -57,7 +70,7 @@ const SOUND_ASSETS = {
   ends: require("../assets/sounds/ends.mp3"),
 } satisfies Record<
   "start" | "success" | "clock" | "skip" | "ends",
-  AVPlaybackSource
+  AudioSource
 >;
 
 const shuffle = (values: string[]) => {
@@ -95,6 +108,18 @@ export default function GameScreen() {
             ? parsed.rounds
             : [true, true, true, true],
         players: parsed.players,
+        teamNames: {
+          team1:
+            typeof parsed.teamNames?.team1 === "string" &&
+            parsed.teamNames.team1.trim().length > 0
+              ? parsed.teamNames.team1.trim()
+              : "Azul",
+          team2:
+            typeof parsed.teamNames?.team2 === "string" &&
+            parsed.teamNames.team2.trim().length > 0
+              ? parsed.teamNames.team2.trim()
+              : "Rojo",
+        },
       };
     } catch {
       return fallbackSetup;
@@ -166,8 +191,11 @@ export default function GameScreen() {
   const clockAlertPlayedRef = useRef(false);
   const allowExitRef = useRef(false);
   const finalNavigationDoneRef = useRef(false);
+  const turnDeadlineRef = useRef<number | null>(null);
+  const timeoutTriggeredRef = useRef(false);
+  const endTurnRef = useRef<(reason?: "timeout" | "manual") => void>(() => {});
   const soundEffectsRef = useRef<
-    Partial<Record<keyof typeof SOUND_ASSETS, Audio.Sound>>
+    Partial<Record<keyof typeof SOUND_ASSETS, AudioPlayer>>
   >({});
 
   const currentTeamPlayers =
@@ -190,6 +218,8 @@ export default function GameScreen() {
   const currentTeamRoundScore =
     currentPlayer?.team === 2 ? roundScores.team2 : roundScores.team1;
   const isUrgentTime = timeLeft <= 10;
+  const team1Name = setup.teamNames.team1;
+  const team2Name = setup.teamNames.team2;
 
   const goToFinalResults = (finalRoundWins: {
     team1: number;
@@ -221,18 +251,28 @@ export default function GameScreen() {
     if (!turnActive) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((previous) => {
-        if (previous <= 1) {
-          clearInterval(timer);
-          endTurn("timeout");
-          return 0;
+      const deadline = turnDeadlineRef.current;
+      if (!deadline) {
+        return;
+      }
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        setTimeLeft(0);
+        clearInterval(timer);
+
+        if (!timeoutTriggeredRef.current) {
+          timeoutTriggeredRef.current = true;
+          endTurnRef.current("timeout");
         }
-        return previous - 1;
-      });
-    }, 1000);
+        return;
+      }
+
+      setTimeLeft(Math.ceil(remainingMs / 1000));
+    }, 100);
 
     return () => clearInterval(timer);
-  });
+  }, [turnActive]);
 
   useEffect(() => {
     if (!turnActive || clockAlertPlayedRef.current) {
@@ -255,6 +295,8 @@ export default function GameScreen() {
         if (previous === null) return null;
         if (previous <= 1) {
           clearInterval(countdownTimer);
+          timeoutTriggeredRef.current = false;
+          turnDeadlineRef.current = Date.now() + setup.timePerTurn * 1000;
           setTurnActive(true);
           setTimeLeft(setup.timePerTurn);
           setSkipsLeft(setup.skipsPerTurn);
@@ -271,39 +313,19 @@ export default function GameScreen() {
   }, [preTurnCountdown, queue, setup.skipsPerTurn, setup.timePerTurn]);
 
   useEffect(() => {
-    let mounted = true;
+    void setAudioModeAsync({ playsInSilentMode: true });
 
-    const loadSounds = async () => {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-      });
-
-      const entries = await Promise.all(
-        Object.entries(SOUND_ASSETS).map(async ([key, asset]) => {
-          const { sound } = await Audio.Sound.createAsync(asset, {
-            shouldPlay: false,
-            volume: 1,
-          });
-          return [key, sound] as const;
-        }),
-      );
-
-      if (!mounted) {
-        await Promise.all(entries.map(([, sound]) => sound.unloadAsync()));
-        return;
-      }
-
-      soundEffectsRef.current = Object.fromEntries(entries);
-    };
-
-    void loadSounds();
+    soundEffectsRef.current = Object.fromEntries(
+      Object.entries(SOUND_ASSETS).map(([key, asset]) => [
+        key,
+        createAudioPlayer(asset),
+      ]),
+    );
 
     return () => {
-      mounted = false;
       const sounds = Object.values(soundEffectsRef.current).filter(Boolean);
       soundEffectsRef.current = {};
-      void Promise.all(sounds.map((sound) => sound?.unloadAsync()));
+      sounds.forEach((sound) => sound?.remove());
     };
   }, []);
 
@@ -314,8 +336,8 @@ export default function GameScreen() {
     }
 
     try {
-      await sound.setPositionAsync(0);
-      await sound.replayAsync();
+      await sound.seekTo(0);
+      sound.play();
     } catch {
       // Ignore audio playback errors to avoid interrupting the turn.
     }
@@ -394,11 +416,11 @@ export default function GameScreen() {
     if (roundScores.team1 > roundScores.team2) {
       nextRoundWins = { ...roundWins, team1: roundWins.team1 + 1 };
       setRoundWins(nextRoundWins);
-      message += "Gana Equipo 1.";
+      message += `Gana ${team1Name}.`;
     } else if (roundScores.team2 > roundScores.team1) {
       nextRoundWins = { ...roundWins, team2: roundWins.team2 + 1 };
       setRoundWins(nextRoundWins);
-      message += "Gana Equipo 2.";
+      message += `Gana ${team2Name}.`;
     } else {
       message += "Empate.";
     }
@@ -408,6 +430,8 @@ export default function GameScreen() {
     setTurnSummary(message);
     setPreTurnCountdown(null);
     setTurnActive(false);
+    turnDeadlineRef.current = null;
+    timeoutTriggeredRef.current = false;
     setCurrentWord(null);
     guessedThisTurnRef.current = 0;
     setSkipsLeft(setup.skipsPerTurn);
@@ -442,6 +466,8 @@ export default function GameScreen() {
     guessedThisTurnRef.current = 0;
 
     setTurnActive(false);
+    turnDeadlineRef.current = null;
+    timeoutTriggeredRef.current = false;
     setCurrentWord(null);
     setTimeLeft(setup.timePerTurn);
     setPreTurnCountdown(null);
@@ -465,6 +491,8 @@ export default function GameScreen() {
     setShowRoundIntro(false);
   };
 
+  endTurnRef.current = endTurn;
+
   const startTurn = () => {
     if (!currentPlayer || gameFinished) return;
 
@@ -477,6 +505,8 @@ export default function GameScreen() {
     setTurnSummary("");
     setPreTurnCountdown(3);
     setTurnActive(false);
+    turnDeadlineRef.current = null;
+    timeoutTriggeredRef.current = false;
     setCurrentWord(null);
     setTimeLeft(setup.timePerTurn);
     setSkipsLeft(setup.skipsPerTurn);
@@ -581,7 +611,7 @@ export default function GameScreen() {
 
   return (
     <LinearGradient
-      colors={["#0f172a", "#1d4ed8", "#1e3a8a"]}
+      colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.container}
@@ -714,7 +744,7 @@ export default function GameScreen() {
 
           <View style={styles.scoreboardCard}>
             <View style={styles.teamScoreCard}>
-              <Text style={styles.teamScoreName}>Equipo 1</Text>
+              <Text style={styles.teamScoreName}>{team1Name}</Text>
               <Text style={styles.teamScoreValue}>{teamScores.team1}</Text>
               <Text style={styles.teamScoreMeta}>
                 {roundWins.team1} rondas ganadas
@@ -722,7 +752,7 @@ export default function GameScreen() {
             </View>
             <View style={styles.teamScoreDivider} />
             <View style={styles.teamScoreCard}>
-              <Text style={styles.teamScoreName}>Equipo 2</Text>
+              <Text style={styles.teamScoreName}>{team2Name}</Text>
               <Text style={styles.teamScoreValue}>{teamScores.team2}</Text>
               <Text style={styles.teamScoreMeta}>
                 {roundWins.team2} rondas ganadas
@@ -797,7 +827,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#fff4d9",
     padding: 20,
     gap: 14,
   },
@@ -814,14 +844,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   kicker: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontWeight: "700",
     letterSpacing: 0.8,
     textTransform: "uppercase",
     fontSize: 12,
   },
   roundText: {
-    color: "white",
+    color: "#111827",
     fontWeight: "800",
     fontSize: 24,
     flex: 1,
@@ -832,20 +862,20 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: "rgba(255, 255, 255, 0.76)",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
+    borderColor: "#fed7aa",
   },
   timerBadgeLabel: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   timerText: {
-    color: "white",
+    color: "#111827",
     fontWeight: "800",
     fontSize: 24,
     textAlign: "center",
@@ -853,9 +883,9 @@ const styles = StyleSheet.create({
   scoreboardCard: {
     marginTop: 18,
     borderRadius: 24,
-    backgroundColor: "rgba(15, 23, 42, 0.28)",
+    backgroundColor: "rgba(255, 255, 255, 0.78)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: "#fed7aa",
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -868,49 +898,49 @@ const styles = StyleSheet.create({
   teamScoreDivider: {
     width: 1,
     alignSelf: "stretch",
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: "rgba(154, 52, 18, 0.22)",
     marginHorizontal: 12,
   },
   teamScoreName: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontWeight: "700",
     fontSize: 14,
   },
   teamScoreValue: {
-    color: "white",
+    color: "#111827",
     fontWeight: "800",
     fontSize: 34,
   },
   teamScoreMeta: {
-    color: "#dbeafe",
+    color: "#78350f",
     fontSize: 13,
     fontWeight: "700",
   },
   turnCard: {
     marginTop: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: "rgba(255, 255, 255, 0.82)",
     borderRadius: 24,
     padding: 24,
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: "#fed7aa",
   },
   turnLabel: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontSize: 13,
     fontWeight: "800",
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
   playerName: {
-    color: "white",
+    color: "#111827",
     fontSize: 36,
     fontWeight: "800",
     textAlign: "center",
   },
   teamLabel: {
-    color: "#dbeafe",
+    color: "#374151",
     marginBottom: 12,
     fontWeight: "700",
   },
@@ -932,15 +962,17 @@ const styles = StyleSheet.create({
     paddingVertical: 34,
     paddingHorizontal: 24,
     backgroundColor: "rgba(255, 255, 255, 0.94)",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
     alignItems: "center",
-    shadowColor: "#020617",
+    shadowColor: "#7c2d12",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.2,
     shadowRadius: 24,
     elevation: 12,
   },
   roundIntroKicker: {
-    color: "#2563eb",
+    color: "#c2410c",
     fontSize: 14,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -956,14 +988,14 @@ const styles = StyleSheet.create({
   },
   roundIntroSubtitle: {
     marginTop: 8,
-    color: "#1e3a8a",
+    color: "#374151",
     fontSize: 26,
     fontWeight: "700",
     textAlign: "center",
   },
   roundIntroHint: {
     marginTop: 14,
-    color: "#334155",
+    color: "#4b5563",
     fontSize: 18,
     fontWeight: "600",
     textAlign: "center",
@@ -973,10 +1005,10 @@ const styles = StyleSheet.create({
     marginTop: 28,
     paddingVertical: 14,
     paddingHorizontal: 32,
-    backgroundColor: "#2563eb",
+    backgroundColor: "#0f172a",
     borderRadius: 12,
     alignItems: "center",
-    shadowColor: "#020617",
+    shadowColor: "#7c2d12",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -995,7 +1027,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   countdownLabel: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontWeight: "800",
     letterSpacing: 0.8,
     fontSize: 16,
@@ -1007,8 +1039,10 @@ const styles = StyleSheet.create({
     borderRadius: 110,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.92)",
-    shadowColor: "#020617",
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    shadowColor: "#7c2d12",
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.22,
     shadowRadius: 26,
@@ -1031,22 +1065,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 18,
     borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: "rgba(255, 255, 255, 0.82)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: "#fed7aa",
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
   },
   activeScoreLabel: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   activeScoreValue: {
-    color: "white",
+    color: "#111827",
     fontSize: 34,
     fontWeight: "800",
   },
@@ -1055,9 +1089,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: "rgba(255, 255, 255, 0.84)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
+    borderColor: "#fed7aa",
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
@@ -1067,19 +1101,19 @@ const styles = StyleSheet.create({
     borderColor: "rgba(254, 202, 202, 0.42)",
   },
   activeTimerLabel: {
-    color: "#bfdbfe",
+    color: "#9a3412",
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
   activeTimerValue: {
-    color: "white",
+    color: "#111827",
     fontSize: 34,
     fontWeight: "900",
   },
   activeTimerValueUrgent: {
-    color: "#fee2e2",
+    color: "#991b1b",
   },
   activeWordStage: {
     flex: 1,
@@ -1091,11 +1125,13 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 280,
     borderRadius: 32,
-    backgroundColor: "rgba(255, 255, 255, 0.98)",
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 26,
-    shadowColor: "#020617",
+    shadowColor: "#7c2d12",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.2,
     shadowRadius: 24,
@@ -1135,10 +1171,10 @@ const styles = StyleSheet.create({
   },
   turnSummary: {
     marginTop: 14,
-    color: "#e2e8f0",
+    color: "#374151",
     textAlign: "center",
     fontWeight: "700",
-    backgroundColor: "rgba(15, 23, 42, 0.22)",
+    backgroundColor: "rgba(255, 255, 255, 0.82)",
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -1146,15 +1182,15 @@ const styles = StyleSheet.create({
   playerScoresContainer: {
     marginTop: 16,
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.28)",
+    backgroundColor: "rgba(255, 255, 255, 0.82)",
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: "#fed7aa",
   },
   playerScoresTitle: {
-    color: "#dbeafe",
+    color: "#111827",
     fontWeight: "800",
     marginBottom: 10,
     fontSize: 16,
@@ -1165,14 +1201,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.08)",
+    borderBottomColor: "rgba(154, 52, 18, 0.14)",
   },
   playerScoreLine: {
-    color: "white",
+    color: "#1f2937",
     fontWeight: "600",
   },
   playerScoreValue: {
-    color: "#f8fafc",
+    color: "#111827",
     fontWeight: "800",
     fontSize: 18,
   },
@@ -1275,7 +1311,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   exitText: {
-    color: "#dbeafe",
+    color: "#9a3412",
     fontWeight: "700",
   },
 });

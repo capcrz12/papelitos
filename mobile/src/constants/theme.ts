@@ -1,14 +1,14 @@
 export const colors = {
-  primary: '#3498db',
-  secondary: '#2ecc71',
-  danger: '#e74c3c',
-  warning: '#f39c12',
-  dark: '#2c3e50',
-  light: '#ecf0f1',
-  gray: '#7f8c8d',
-  white: '#ffffff',
-  team1: '#3498db',
-  team2: '#e74c3c',
+  primary: "#0f172a",
+  secondary: "#16a34a",
+  danger: "#dc2626",
+  warning: "#d97706",
+  dark: "#111827",
+  light: "#e5e7eb",
+  gray: "#6b7280",
+  white: "#ffffff",
+  team1: "#2563eb",
+  team2: "#ef4444",
 };
 
 export const spacing = {
@@ -31,9 +31,9 @@ export const typography = {
     xxxl: 48,
   },
   weights: {
-    regular: '400' as const,
-    medium: '500' as const,
-    bold: '700' as const,
+    regular: "400" as const,
+    medium: "500" as const,
+    bold: "700" as const,
   },
 };
 

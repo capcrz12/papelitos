@@ -1,6 +1,6 @@
 ﻿# Mobile Source
 
-Codigo fuente de la app movil WordWave.
+Codigo fuente de la app movil QueRule.
 
 ## Estructura
 

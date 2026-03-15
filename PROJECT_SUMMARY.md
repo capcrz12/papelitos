@@ -1,6 +1,6 @@
 ﻿# Project Summary
 
-WordWave es una aplicacion movil para jugar papelitos por equipos en un solo dispositivo.
+QueRule es una aplicacion movil para jugar papelitos por equipos en un solo dispositivo.
 
 ## Estado actual
 

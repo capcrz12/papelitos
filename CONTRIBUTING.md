@@ -1,6 +1,6 @@
 ﻿# Contributing
 
-Gracias por contribuir a WordWave.
+Gracias por contribuir a QueRule.
 
 ## Flujo recomendado
 

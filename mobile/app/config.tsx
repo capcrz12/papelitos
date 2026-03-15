@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { Button } from "../src/components/Button";
 
 interface PlayerConfig {
@@ -23,6 +24,10 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
+  teamNames?: {
+    team1: string;
+    team2: string;
+  };
 }
 
 const skipOptions = [1, 2, 3, null] as const;
@@ -61,6 +66,10 @@ export default function ConfigScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
+        teamNames: {
+          team1: "Azul",
+          team2: "Rojo",
+        },
       };
     }
     try {
@@ -78,6 +87,18 @@ export default function ConfigScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        teamNames: {
+          team1:
+            typeof parsed.teamNames?.team1 === "string" &&
+            parsed.teamNames.team1.trim().length > 0
+              ? parsed.teamNames.team1.trim()
+              : "Azul",
+          team2:
+            typeof parsed.teamNames?.team2 === "string" &&
+            parsed.teamNames.team2.trim().length > 0
+              ? parsed.teamNames.team2.trim()
+              : "Rojo",
+        },
       };
     } catch {
       return {
@@ -85,6 +106,10 @@ export default function ConfigScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
+        teamNames: {
+          team1: "Azul",
+          team2: "Rojo",
+        },
       };
     }
   }, [params.settings]);
@@ -124,13 +149,19 @@ export default function ConfigScreen() {
           wordsPerPlayer,
           skipsPerTurn,
           rounds,
+          teamNames: currentSettings.teamNames,
         }),
       },
     });
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Configurar partida</Text>
         <Text style={styles.subtitle}>Ajustes rapidos</Text>
@@ -253,22 +284,21 @@ export default function ConfigScreen() {
           size="large"
         />
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
   header: {
     paddingTop: 52,
     paddingBottom: 16,
     paddingHorizontal: 20,
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.86)",
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#fed7aa",
   },
   title: {
     fontSize: 26,
@@ -284,10 +314,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   card: {
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.86)",
     borderRadius: 12,
     padding: 14,
     marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
   },
   sectionTitle: {
     fontSize: 18,
@@ -337,7 +369,7 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-    backgroundColor: "white",
+    borderTopColor: "#fed7aa",
+    backgroundColor: "rgba(255,255,255,0.9)",
   },
 });

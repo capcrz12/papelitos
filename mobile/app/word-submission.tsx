@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AnimatePresence, MotiView } from "moti";
+import { LinearGradient } from "expo-linear-gradient";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
 import { LoadingOverlay } from "../src/components/LoadingOverlay";
@@ -25,6 +26,10 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
+  teamNames: {
+    team1: string;
+    team2: string;
+  };
 }
 
 const defaultSetup: GameSetup = {
@@ -33,6 +38,10 @@ const defaultSetup: GameSetup = {
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
+  teamNames: {
+    team1: "Azul",
+    team2: "Rojo",
+  },
 };
 
 export default function WordSubmissionScreen() {
@@ -62,6 +71,18 @@ export default function WordSubmissionScreen() {
             ? parsed.rounds
             : [true, true, true, true],
         players: parsed.players,
+        teamNames: {
+          team1:
+            typeof parsed.teamNames?.team1 === "string" &&
+            parsed.teamNames.team1.trim().length > 0
+              ? parsed.teamNames.team1.trim()
+              : "Azul",
+          team2:
+            typeof parsed.teamNames?.team2 === "string" &&
+            parsed.teamNames.team2.trim().length > 0
+              ? parsed.teamNames.team2.trim()
+              : "Rojo",
+        },
       };
     } catch {
       return defaultSetup;
@@ -121,7 +142,12 @@ export default function WordSubmissionScreen() {
 
   if (!currentPlayer) {
     return (
-      <View style={styles.centerContainer}>
+      <LinearGradient
+        colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.centerContainer}
+      >
         <Text style={styles.errorText}>No hay jugadores configurados.</Text>
         <Button
           title="Volver a configurar"
@@ -129,12 +155,17 @@ export default function WordSubmissionScreen() {
           variant="primary"
           size="large"
         />
-      </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Carga de palabras</Text>
         <Text style={styles.subtitle}>
@@ -154,7 +185,11 @@ export default function WordSubmissionScreen() {
           >
             <Text style={styles.handoffTitle}>Pasa el dispositivo a:</Text>
             <Text style={styles.playerName}>{currentPlayer.name}</Text>
-            <Text style={styles.playerTeam}>Equipo {currentPlayer.team}</Text>
+            <Text style={styles.playerTeam}>
+              {currentPlayer.team === 1
+                ? setup.teamNames.team1
+                : setup.teamNames.team2}
+            </Text>
             <Button
               title="Ya lo tiene"
               onPress={() => setRevealInput(true)}
@@ -217,19 +252,17 @@ export default function WordSubmissionScreen() {
         )}
       </AnimatePresence>
       <LoadingOverlay visible={isPreparingGame} title="Mezclando palabras..." />
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
   },
   centerContainer: {
     flex: 1,
     padding: 20,
-    backgroundColor: "#f8f9fa",
     justifyContent: "center",
     gap: 16,
   },
@@ -240,12 +273,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   header: {
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.86)",
     paddingTop: 56,
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#fed7aa",
   },
   title: {
     fontSize: 28,
@@ -260,7 +293,9 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 20,
     borderRadius: 14,
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.86)",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
     gap: 12,
   },
   handoffTitle: {
@@ -292,9 +327,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   wordCard: {
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.9)",
     borderRadius: 12,
     padding: 14,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
   },
   wordLabel: {
     marginBottom: 8,
@@ -303,9 +340,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
+    borderTopColor: "#fed7aa",
     padding: 16,
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.9)",
     gap: 12,
   },
   backLink: {

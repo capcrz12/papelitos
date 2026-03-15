@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "WordWave",
-    "slug": "wordwave",
+    "name": "QueRule",
+    "slug": "QueRule",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
+    "icon": "./assets/Icon-1024.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -12,15 +13,31 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wordwave.app"
+      "bundleIdentifier": "com.QueRule.app"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/Icon-1024.png",
         "backgroundColor": "#4CAF50"
       },
-      "package": "com.wordwave.app"
+      "package": "com.QueRule.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
-    "plugins": ["expo-router"],
-    "scheme": "wordwave"
+    "plugins": [
+      "expo-router",
+      "expo-audio",
+      "expo-video"
+    ],
+    "scheme": "QueRule",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fbef9aed-43f0-4fd8-8b06-00da6f02fd65"
+      }
+    },
+    "owner": "cap12"
   }
 }

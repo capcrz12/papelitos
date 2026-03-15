@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   LayoutAnimation,
-  Platform,
   type LayoutChangeEvent,
   Pressable,
   View,
@@ -12,11 +11,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  UIManager,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { LinearGradient } from "expo-linear-gradient";
 import Reanimated, {
   runOnJS,
   useAnimatedStyle,
@@ -42,6 +41,10 @@ interface MatchSettings {
   wordsPerPlayer: number;
   skipsPerTurn: number | null;
   rounds: boolean[];
+  teamNames: {
+    team1: string;
+    team2: string;
+  };
 }
 
 const formatSkipsPerTurn = (value: number | null) =>
@@ -164,13 +167,6 @@ function DraggablePlayerChip({
 }
 
 export default function TeamsScreen() {
-  if (
-    Platform.OS === "android" &&
-    UIManager.setLayoutAnimationEnabledExperimental
-  ) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -193,6 +189,10 @@ export default function TeamsScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true],
+        teamNames: {
+          team1: "Azul",
+          team2: "Rojo",
+        },
       };
     }
     try {
@@ -210,6 +210,18 @@ export default function TeamsScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        teamNames: {
+          team1:
+            typeof parsed.teamNames?.team1 === "string" &&
+            parsed.teamNames.team1.trim().length > 0
+              ? parsed.teamNames.team1.trim()
+              : "Azul",
+          team2:
+            typeof parsed.teamNames?.team2 === "string" &&
+            parsed.teamNames.team2.trim().length > 0
+              ? parsed.teamNames.team2.trim()
+              : "Rojo",
+        },
       };
     } catch {
       return {
@@ -217,6 +229,10 @@ export default function TeamsScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true],
+        teamNames: {
+          team1: "Azul",
+          team2: "Rojo",
+        },
       };
     }
   }, [params.settings]);
@@ -224,7 +240,7 @@ export default function TeamsScreen() {
   const [players, setPlayers] = useState<PlayerConfig[]>(initialPlayers);
   const [newName, setNewName] = useState("");
   const [activeTeam, setActiveTeam] = useState<Team>(1);
-  const [settings] = useState<MatchSettings>(initialSettings);
+  const [settings, setSettings] = useState<MatchSettings>(initialSettings);
   const [isStartingMatch, setIsStartingMatch] = useState(false);
   const [draggingTeam, setDraggingTeam] = useState<Team | null>(null);
   const [hoveredDropTeam, setHoveredDropTeam] = useState<Team | null>(null);
@@ -244,6 +260,16 @@ export default function TeamsScreen() {
     () => players.filter((player) => player.team === 2),
     [players],
   );
+
+  const updateTeamName = (team: Team, value: string) => {
+    setSettings((previous) => ({
+      ...previous,
+      teamNames: {
+        ...previous.teamNames,
+        [team === 1 ? "team1" : "team2"]: value,
+      },
+    }));
+  };
 
   const addPlayer = () => {
     const name = newName.trim();
@@ -366,6 +392,17 @@ export default function TeamsScreen() {
   }, [players.length]);
 
   const startMatch = () => {
+    const trimmedTeam1Name = settings.teamNames.team1.trim();
+    const trimmedTeam2Name = settings.teamNames.team2.trim();
+
+    if (!trimmedTeam1Name || !trimmedTeam2Name) {
+      Alert.alert(
+        "Nombres de equipos requeridos",
+        "Escribe un nombre para ambos equipos antes de empezar.",
+      );
+      return;
+    }
+
     if (team1Players.length < 2 || team2Players.length < 2) {
       Alert.alert(
         "Jugadores insuficientes",
@@ -385,6 +422,10 @@ export default function TeamsScreen() {
             wordsPerPlayer: settings.wordsPerPlayer,
             skipsPerTurn: settings.skipsPerTurn,
             rounds: settings.rounds,
+            teamNames: {
+              team1: trimmedTeam1Name,
+              team2: trimmedTeam2Name,
+            },
           }),
         },
       });
@@ -393,7 +434,12 @@ export default function TeamsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Equipos</Text>
         <Text style={styles.subtitle}>Agrega jugadores rapido y empieza</Text>
@@ -417,6 +463,17 @@ export default function TeamsScreen() {
       </View>
 
       <View style={styles.addCard}>
+        <Text style={styles.addCardTitle}>Equipos</Text>
+        <Input
+          placeholder="Nombre del equipo azul"
+          value={settings.teamNames.team1}
+          onChangeText={(value) => updateTeamName(1, value)}
+        />
+        <Input
+          placeholder="Nombre del equipo rojo"
+          value={settings.teamNames.team2}
+          onChangeText={(value) => updateTeamName(2, value)}
+        />
         <Text style={styles.addCardTitle}>Quien se suma?</Text>
         <Input
           placeholder="Escribe nombre y pulsa +"
@@ -433,7 +490,9 @@ export default function TeamsScreen() {
             ]}
             onPress={() => setActiveTeam(1)}
           >
-            <Text style={styles.teamSwitchText}>Azul</Text>
+            <Text style={styles.teamSwitchText}>
+              {settings.teamNames.team1.trim() || "Azul"}
+            </Text>
           </Pressable>
           <Pressable
             style={[
@@ -442,7 +501,9 @@ export default function TeamsScreen() {
             ]}
             onPress={() => setActiveTeam(2)}
           >
-            <Text style={styles.teamSwitchText}>Rojo</Text>
+            <Text style={styles.teamSwitchText}>
+              {settings.teamNames.team2.trim() || "Rojo"}
+            </Text>
           </Pressable>
           <Pressable style={styles.plusButton} onPress={addPlayer}>
             <Text style={styles.plusButtonText}>+</Text>
@@ -481,7 +542,9 @@ export default function TeamsScreen() {
             onPress={() => setActiveTeam(1)}
             onLayout={handleTeamCardLayout}
           >
-            <Text style={styles.teamTitle}>Equipo Azul</Text>
+            <Text style={styles.teamTitle}>
+              {settings.teamNames.team1.trim() || "Azul"}
+            </Text>
             <Text style={styles.teamCounter}>
               {team1Players.length} jugadores
             </Text>
@@ -549,7 +612,9 @@ export default function TeamsScreen() {
             onPress={() => setActiveTeam(2)}
             onLayout={handleTeamCardLayout}
           >
-            <Text style={styles.teamTitle}>Equipo Rojo</Text>
+            <Text style={styles.teamTitle}>
+              {settings.teamNames.team2.trim() || "Rojo"}
+            </Text>
             <Text style={styles.teamCounter}>
               {team2Players.length} jugadores
             </Text>
@@ -610,14 +675,13 @@ export default function TeamsScreen() {
         visible={isStartingMatch}
         title="Preparando ronda inicial..."
       />
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f4f7ff",
   },
   header: {
     paddingTop: 52,
@@ -649,14 +713,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addCard: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.82)",
     marginHorizontal: 16,
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#fed7aa",
     gap: 10,
-    shadowColor: "#2563eb",
+    shadowColor: "#7c2d12",
     shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -838,9 +902,9 @@ const styles = StyleSheet.create({
     color: "#dc2626",
   },
   footer: {
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.88)",
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
+    borderTopColor: "#fed7aa",
     padding: 16,
   },
   footerHint: {

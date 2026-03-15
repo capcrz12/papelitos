@@ -6,7 +6,7 @@
 
 ```bash
 gh auth login
-gh repo create wordwave --public --source=. --remote=origin --push
+gh repo create QueRule --public --source=. --remote=origin --push
 ```
 
 ### Opcion web
@@ -15,7 +15,7 @@ gh repo create wordwave --public --source=. --remote=origin --push
 2. Conecta el remoto local:
 
 ```bash
-git remote add origin https://github.com/TU_USUARIO/wordwave.git
+git remote add origin https://github.com/TU_USUARIO/QueRule.git
 git branch -M main
 git push -u origin main
 ```

@@ -17,6 +17,10 @@ interface GameSetup {
   skipsPerTurn: number | null;
   rounds: boolean[];
   players: PlayerConfig[];
+  teamNames: {
+    team1: string;
+    team2: string;
+  };
 }
 
 interface FinalStats {
@@ -40,6 +44,10 @@ const fallbackSetup: GameSetup = {
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
   players: [],
+  teamNames: {
+    team1: "Azul",
+    team2: "Rojo",
+  },
 };
 
 const fallbackStats: FinalStats = {
@@ -80,6 +88,18 @@ export default function FinalResultsScreen() {
             ? parsed.rounds
             : [true, true, true, true],
         players: parsed.players,
+        teamNames: {
+          team1:
+            typeof parsed.teamNames?.team1 === "string" &&
+            parsed.teamNames.team1.trim().length > 0
+              ? parsed.teamNames.team1.trim()
+              : "Azul",
+          team2:
+            typeof parsed.teamNames?.team2 === "string" &&
+            parsed.teamNames.team2.trim().length > 0
+              ? parsed.teamNames.team2.trim()
+              : "Rojo",
+        },
       };
     } catch {
       return fallbackSetup;
@@ -125,10 +145,20 @@ export default function FinalResultsScreen() {
 
   const winnerTeam: 1 | 2 | null =
     stats.roundWins.team1 === stats.roundWins.team2
-      ? null
+      ? stats.teamScores.team1 === stats.teamScores.team2
+        ? null
+        : stats.teamScores.team1 > stats.teamScores.team2
+          ? 1
+          : 2
       : stats.roundWins.team1 > stats.roundWins.team2
         ? 1
         : 2;
+
+  const usedScoreTiebreak =
+    stats.roundWins.team1 === stats.roundWins.team2 &&
+    stats.teamScores.team1 !== stats.teamScores.team2;
+  const team1Name = setup.teamNames.team1;
+  const team2Name = setup.teamNames.team2;
 
   const winnerPlayers =
     winnerTeam === 1
@@ -147,6 +177,7 @@ export default function FinalResultsScreen() {
           wordsPerPlayer: setup.wordsPerPlayer,
           skipsPerTurn: setup.skipsPerTurn,
           rounds: setup.rounds,
+          teamNames: setup.teamNames,
         }),
       },
     });
@@ -154,7 +185,7 @@ export default function FinalResultsScreen() {
 
   return (
     <LinearGradient
-      colors={["#082f49", "#0f766e", "#115e59"]}
+      colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.container}
@@ -168,7 +199,11 @@ export default function FinalResultsScreen() {
         >
           <Text style={styles.heroKicker}>Resultado final</Text>
           <Text style={styles.heroTitle}>
-            {winnerTeam ? `Equipo ${winnerTeam} ganador` : "Empate"}
+            {winnerTeam
+              ? winnerTeam === 1
+                ? `${team1Name} gana`
+                : `${team2Name} gana`
+              : "Empate"}
           </Text>
           <Text style={styles.heroSubtitle}>
             {winnerTeam
@@ -176,8 +211,10 @@ export default function FinalResultsScreen() {
                   winnerTeam === 1
                     ? stats.roundWins.team1
                     : stats.roundWins.team2
+                }${
+                  usedScoreTiebreak ? " · Desempate por total de aciertos" : ""
                 }`
-              : "Ningun equipo supero al otro en rondas"}
+              : "Empate en rondas y en total de aciertos"}
           </Text>
 
           {winnerPlayers.length > 0 && (
@@ -205,7 +242,7 @@ export default function FinalResultsScreen() {
           <Text style={styles.sectionTitle}>Estadisticas por equipo</Text>
           <View style={styles.teamRow}>
             <View style={styles.teamBox}>
-              <Text style={styles.teamName}>Equipo 1</Text>
+              <Text style={styles.teamName}>{team1Name}</Text>
               <Text style={styles.teamMetric}>
                 Aciertos: {stats.teamScores.team1}
               </Text>
@@ -214,7 +251,7 @@ export default function FinalResultsScreen() {
               </Text>
             </View>
             <View style={styles.teamBox}>
-              <Text style={styles.teamName}>Equipo 2</Text>
+              <Text style={styles.teamName}>{team2Name}</Text>
               <Text style={styles.teamMetric}>
                 Aciertos: {stats.teamScores.team2}
               </Text>
@@ -251,7 +288,7 @@ export default function FinalResultsScreen() {
                   Ronda {roundId}: {roundName}
                 </Text>
                 <Text style={styles.roundTeamTotals}>
-                  Equipo 1: {team1Round} · Equipo 2: {team2Round}
+                  {team1Name}: {team1Round} · {team2Name}: {team2Round}
                 </Text>
 
                 {setup.players.map((player) => (
@@ -316,15 +353,15 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     borderRadius: 26,
-    backgroundColor: "rgba(240, 253, 250, 0.96)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderWidth: 1,
-    borderColor: "rgba(13, 148, 136, 0.38)",
+    borderColor: "#fed7aa",
     paddingVertical: 22,
     paddingHorizontal: 16,
     gap: 8,
   },
   heroKicker: {
-    color: "#0f766e",
+    color: "#c2410c",
     textAlign: "center",
     fontWeight: "800",
     letterSpacing: 0.7,
@@ -338,7 +375,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   heroSubtitle: {
-    color: "#155e75",
+    color: "#374151",
     textAlign: "center",
     fontWeight: "700",
     fontSize: 14,
@@ -354,21 +391,21 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: "rgba(20, 184, 166, 0.16)",
+    backgroundColor: "rgba(251, 191, 36, 0.16)",
     borderWidth: 1,
-    borderColor: "rgba(15, 118, 110, 0.28)",
+    borderColor: "rgba(180, 83, 9, 0.26)",
   },
   winnerNameText: {
-    color: "#134e4a",
+    color: "#92400e",
     fontWeight: "700",
   },
   statsCard: {
     borderRadius: 20,
     paddingVertical: 14,
     paddingHorizontal: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.93)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderWidth: 1,
-    borderColor: "rgba(15, 118, 110, 0.2)",
+    borderColor: "#fed7aa",
     gap: 8,
   },
   sectionTitle: {
@@ -384,7 +421,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 14,
     padding: 10,
-    backgroundColor: "rgba(13, 148, 136, 0.1)",
+    backgroundColor: "rgba(251, 191, 36, 0.12)",
     gap: 4,
   },
   teamName: {
@@ -393,14 +430,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   teamMetric: {
-    color: "#164e63",
+    color: "#78350f",
     fontWeight: "600",
   },
   roundCard: {
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 10,
-    backgroundColor: "rgba(240, 249, 255, 0.9)",
+    backgroundColor: "rgba(255, 250, 245, 0.95)",
     gap: 6,
   },
   roundTitle: {
@@ -409,7 +446,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   roundTeamTotals: {
-    color: "#0e7490",
+    color: "#c2410c",
     fontWeight: "700",
     fontSize: 12,
   },

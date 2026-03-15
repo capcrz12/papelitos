@@ -1,10 +1,10 @@
-﻿# WordWave
+﻿# QueRule
 
 Juego de papelitos en un solo dispositivo.
 
 ## Que es
 
-WordWave es una app movil para jugar por equipos pasando el mismo telefono entre jugadores.
+QueRule es una app movil para jugar por equipos pasando el mismo telefono entre jugadores.
 
 ## Flujo de juego
 
