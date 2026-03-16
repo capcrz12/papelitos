@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
 import { Button } from "../src/components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PlayerConfig {
   id: string;
@@ -71,6 +72,7 @@ const fallbackStats: FinalStats = {
 export default function FinalResultsScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const setup = useMemo<GameSetup>(() => {
     const raw = params.setup as string | undefined;
@@ -250,7 +252,12 @@ export default function FinalResultsScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
+        ]}
+      >
         <MotiView
           from={{ opacity: 0, translateY: 18, scale: 0.97 }}
           animate={{ opacity: 1, translateY: 0, scale: 1 }}

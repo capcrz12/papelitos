@@ -1,0 +1,38 @@
+﻿[
+  {
+    "id": "b50475e1-6910-4184-af3c-384da86c0aea",
+    "status": "NEW",
+    "platform": "ANDROID",
+    "artifacts": {},
+    "fingerprint": {
+      "id": "019cf1c0-fa2b-7296-a003-6a508072297c",
+      "hash": "974fb89a2fd1ee6ea2f8e4c8ab9ff47102eebc74"
+    },
+    "initiatingActor": {
+      "id": "db68fed7-f7d2-4ec2-8a8b-33d320764c36",
+      "displayName": "cap12"
+    },
+    "logFiles": [],
+    "project": {
+      "id": "fbef9aed-43f0-4fd8-8b06-00da6f02fd65",
+      "name": "QueRule",
+      "slug": "QueRule",
+      "ownerAccount": {
+        "id": "be873ac4-a48e-4b44-9225-a9efc7da47e1",
+        "name": "cap12"
+      }
+    },
+    "distribution": "INTERNAL",
+    "buildProfile": "preview",
+    "sdkVersion": "54.0.0",
+    "appVersion": "1.0.0",
+    "appBuildVersion": "1",
+    "gitCommitHash": "e8f1584a6fb1c66cfc1212d28e4fb5990c957d79",
+    "gitCommitMessage": "multiples equipos",
+    "priority": "NORMAL",
+    "createdAt": "2026-03-15T15:07:56.948Z",
+    "updatedAt": "2026-03-15T15:07:56.948Z",
+    "expirationDate": "2026-03-29T15:07:57.022Z",
+    "isForIosSimulator": false
+  }
+]

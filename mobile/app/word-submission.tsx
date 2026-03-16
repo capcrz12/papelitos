@@ -13,6 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
 import { LoadingOverlay } from "../src/components/LoadingOverlay";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PlayerConfig {
   id: string;
@@ -57,6 +58,7 @@ const defaultSetup: GameSetup = {
 export default function WordSubmissionScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const setup = useMemo<GameSetup>(() => {
     const raw = params.setup as string | undefined;
@@ -195,7 +197,7 @@ export default function WordSubmissionScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.title}>Carga de palabras</Text>
         <Text style={styles.subtitle}>
           Jugador {currentPlayerIndex + 1} de {totalPlayers}
@@ -261,7 +263,9 @@ export default function WordSubmissionScreen() {
               ))}
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View
+              style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}
+            >
               <TouchableOpacity onPress={() => setRevealInput(false)}>
                 <Text style={styles.backLink}>Ocultar y volver</Text>
               </TouchableOpacity>

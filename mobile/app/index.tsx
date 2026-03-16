@@ -10,11 +10,13 @@ import {
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Button } from "../src/components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isCompact = width < 390;
+  const insets = useSafeAreaInsets();
 
   const anim0 = useRef(new Animated.Value(0)).current;
   const anim1 = useRef(new Animated.Value(0)).current;
@@ -59,7 +61,12 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         bounces
       >
-        <View style={styles.content}>
+        <View
+          style={[
+            styles.content,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 132 },
+          ]}
+        >
           <Animated.View
             style={[
               styles.heroCard,
@@ -301,7 +308,7 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.floatingCtaWrap}>
+      <View style={[styles.floatingCtaWrap, { bottom: insets.bottom + 16 }]}>
         <Button
           title="Crear partida"
           onPress={() => router.push("/teams")}

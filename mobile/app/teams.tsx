@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Input } from "../src/components/Input";
 import { Button } from "../src/components/Button";
 import { LoadingOverlay } from "../src/components/LoadingOverlay";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PlayerConfig {
   id: string;
@@ -120,6 +121,7 @@ const normalizeTeamNames = (
 export default function TeamsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const initialPlayers = useMemo<PlayerConfig[]>(() => {
     const raw = params.players as string | undefined;
@@ -386,7 +388,7 @@ export default function TeamsScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View>
           <Text style={styles.title}>Equipos</Text>
           <Text style={styles.subtitle}>
@@ -496,7 +498,7 @@ export default function TeamsScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Text style={styles.footerText}>
           {settings.timePerTurn}s · {settings.wordsPerPlayer} palabras ·{" "}
           {formatSkipsPerTurn(settings.skipsPerTurn)} ·{" "}

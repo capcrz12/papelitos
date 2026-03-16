@@ -17,6 +17,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { AnimatePresence, MotiView } from "moti";
 import { Button } from "../src/components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PlayerConfig {
   id: string;
@@ -96,6 +97,7 @@ export default function GameScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const setup = useMemo<GameSetup>(() => {
     const raw = params.setup as string | undefined;
@@ -703,7 +705,10 @@ export default function GameScreen() {
       colors={["#fff4d9", "#ffe4d6", "#f7f7ff"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.container}
+      style={[
+        styles.container,
+        { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 },
+      ]}
     >
       {showRoundIntro && !gameFinished ? (
         <View style={styles.roundIntroScreen}>

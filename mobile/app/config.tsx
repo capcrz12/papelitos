@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Button } from "../src/components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PlayerConfig {
   id: string;
@@ -54,6 +55,7 @@ const roundNames = [
 export default function ConfigScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const players = useMemo<PlayerConfig[]>(() => {
     const raw = params.players as string | undefined;
@@ -186,7 +188,7 @@ export default function ConfigScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title}>Configurar partida</Text>
         <Text style={styles.subtitle}>Ajustes rapidos</Text>
       </View>
@@ -300,7 +302,7 @@ export default function ConfigScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Button
           title="Guardar y volver"
           onPress={saveConfig}
