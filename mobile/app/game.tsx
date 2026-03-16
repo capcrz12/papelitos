@@ -30,6 +30,7 @@ interface GameSetup {
   wordsPerPlayer: number;
   skipsPerTurn: number | null;
   rounds: boolean[];
+  showIndividualStats: boolean;
   players: PlayerConfig[];
   teamOrder: number[];
   teamNames: Record<string, string>;
@@ -76,6 +77,7 @@ const fallbackSetup: GameSetup = {
   wordsPerPlayer: 3,
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
+  showIndividualStats: false,
   players: [],
   teamOrder: [1, 2],
   teamNames: {
@@ -130,6 +132,7 @@ export default function GameScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        showIndividualStats: Boolean(parsed.showIndividualStats),
         players: parsed.players,
         teamOrder:
           Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2
@@ -913,24 +916,29 @@ export default function GameScreen() {
             <Text style={styles.turnSummary}>{turnSummary}</Text>
           )}
 
-          <ScrollView style={styles.playerScoresContainer}>
-            <Text style={styles.playerScoresTitle}>Puntuacion individual</Text>
-            {setup.players
-              .slice()
-              .sort(
-                (a, b) => (playerScores[b.id] || 0) - (playerScores[a.id] || 0),
-              )
-              .map((player) => (
-                <View key={player.id} style={styles.playerScoreRow}>
-                  <Text style={styles.playerScoreLine}>
-                    {player.name} ({getTeamName(player.team)})
-                  </Text>
-                  <Text style={styles.playerScoreValue}>
-                    {playerScores[player.id] || 0}
-                  </Text>
-                </View>
-              ))}
-          </ScrollView>
+          {setup.showIndividualStats && (
+            <ScrollView style={styles.playerScoresContainer}>
+              <Text style={styles.playerScoresTitle}>
+                Puntuación individual
+              </Text>
+              {setup.players
+                .slice()
+                .sort(
+                  (a, b) =>
+                    (playerScores[b.id] || 0) - (playerScores[a.id] || 0),
+                )
+                .map((player) => (
+                  <View key={player.id} style={styles.playerScoreRow}>
+                    <Text style={styles.playerScoreLine}>
+                      {player.name} ({getTeamName(player.team)})
+                    </Text>
+                    <Text style={styles.playerScoreValue}>
+                      {playerScores[player.id] || 0}
+                    </Text>
+                  </View>
+                ))}
+            </ScrollView>
+          )}
 
           <View style={styles.footer}>
             <TouchableOpacity onPress={returnToStart}>

@@ -29,6 +29,7 @@ interface MatchSettings {
   wordsPerPlayer: number;
   skipsPerTurn: number | null;
   rounds: boolean[];
+  showIndividualStats: boolean;
   teamNames: Record<string, string>;
   teamOrder: number[];
 }
@@ -153,6 +154,7 @@ export default function TeamsScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true],
+        showIndividualStats: false,
         teamOrder: [1, 2],
         teamNames: {
           "1": getDefaultTeamName(1),
@@ -179,6 +181,7 @@ export default function TeamsScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        showIndividualStats: Boolean(parsed.showIndividualStats),
         teamOrder,
         teamNames,
       };
@@ -188,6 +191,7 @@ export default function TeamsScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true],
+        showIndividualStats: false,
         teamOrder: [1, 2],
         teamNames: {
           "1": getDefaultTeamName(1),
@@ -372,6 +376,7 @@ export default function TeamsScreen() {
             wordsPerPlayer: settings.wordsPerPlayer,
             skipsPerTurn: settings.skipsPerTurn,
             rounds: settings.rounds,
+            showIndividualStats: settings.showIndividualStats,
             teamOrder: teamIds,
             teamNames: finalTeamNames,
           }),

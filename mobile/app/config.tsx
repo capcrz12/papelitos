@@ -24,6 +24,7 @@ interface GameSetup {
   wordsPerPlayer: number;
   skipsPerTurn: number | null;
   rounds: boolean[];
+  showIndividualStats?: boolean;
   players: PlayerConfig[];
   teamNames?: Record<string, string>;
   teamOrder?: number[];
@@ -77,6 +78,7 @@ export default function ConfigScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
+        showIndividualStats: false,
         teamNames: { "1": "Azul", "2": "Rojo" },
         teamOrder: [1, 2],
       };
@@ -96,6 +98,7 @@ export default function ConfigScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        showIndividualStats: Boolean(parsed.showIndividualStats),
         teamNames:
           parsed.teamNames && typeof parsed.teamNames === "object"
             ? Object.entries(
@@ -133,6 +136,7 @@ export default function ConfigScreen() {
         wordsPerPlayer: 3,
         skipsPerTurn: 1,
         rounds: [true, true, true, true] as boolean[],
+        showIndividualStats: false,
         teamNames: { "1": "Azul", "2": "Rojo" },
         teamOrder: [1, 2],
       };
@@ -147,6 +151,9 @@ export default function ConfigScreen() {
     currentSettings.skipsPerTurn,
   );
   const [rounds, setRounds] = useState<boolean[]>(currentSettings.rounds);
+  const [showIndividualStats, setShowIndividualStats] = useState(
+    Boolean(currentSettings.showIndividualStats),
+  );
 
   const timeOptions = [20, 25, 30, 45, 60];
   const wordsOptions = [2, 3, 4, 5, 6];
@@ -174,6 +181,7 @@ export default function ConfigScreen() {
           wordsPerPlayer,
           skipsPerTurn,
           rounds,
+          showIndividualStats,
           teamNames: currentSettings.teamNames,
           teamOrder: currentSettings.teamOrder,
         }),
@@ -286,6 +294,19 @@ export default function ConfigScreen() {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Privacidad</Text>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>
+              Mostrar estadísticas individuales
+            </Text>
+            <Switch
+              value={showIndividualStats}
+              onValueChange={setShowIndividualStats}
+            />
+          </View>
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>Resumen</Text>
           <Text style={styles.summaryText}>
             Rondas activas: {rounds.filter(Boolean).length}
@@ -298,6 +319,10 @@ export default function ConfigScreen() {
           </Text>
           <Text style={styles.summaryText}>
             Pases por turno: {formatSkipsPerTurn(skipsPerTurn)}
+          </Text>
+          <Text style={styles.summaryText}>
+            Estadísticas individuales:{" "}
+            {showIndividualStats ? "Visibles" : "Ocultas"}
           </Text>
         </View>
       </ScrollView>

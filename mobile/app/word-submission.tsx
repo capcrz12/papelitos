@@ -26,6 +26,7 @@ interface GameSetup {
   wordsPerPlayer: number;
   skipsPerTurn: number | null;
   rounds: boolean[];
+  showIndividualStats: boolean;
   players: PlayerConfig[];
   teamOrder: number[];
   teamNames: Record<string, string>;
@@ -58,6 +59,7 @@ const defaultSetup: GameSetup = {
   wordsPerPlayer: 3,
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
+  showIndividualStats: false,
   players: [],
   teamOrder: [1, 2],
   teamNames: {
@@ -93,6 +95,7 @@ export default function WordSubmissionScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        showIndividualStats: Boolean(parsed.showIndividualStats),
         players: parsed.players,
         teamOrder:
           Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2

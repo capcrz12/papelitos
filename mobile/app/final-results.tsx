@@ -17,6 +17,7 @@ interface GameSetup {
   wordsPerPlayer: number;
   skipsPerTurn: number | null;
   rounds: boolean[];
+  showIndividualStats: boolean;
   players: PlayerConfig[];
   teamOrder: number[];
   teamNames: Record<string, string>;
@@ -53,6 +54,7 @@ const fallbackSetup: GameSetup = {
   wordsPerPlayer: 3,
   skipsPerTurn: 1,
   rounds: [true, true, true, true],
+  showIndividualStats: false,
   players: [],
   teamOrder: [1, 2],
   teamNames: {
@@ -99,6 +101,7 @@ export default function FinalResultsScreen() {
           Array.isArray(parsed.rounds) && parsed.rounds.length === 4
             ? parsed.rounds
             : [true, true, true, true],
+        showIndividualStats: Boolean(parsed.showIndividualStats),
         players: parsed.players,
         teamOrder:
           Array.isArray(parsed.teamOrder) && parsed.teamOrder.length >= 2
@@ -238,6 +241,7 @@ export default function FinalResultsScreen() {
           wordsPerPlayer: setup.wordsPerPlayer,
           skipsPerTurn: setup.skipsPerTurn,
           rounds: setup.rounds,
+          showIndividualStats: setup.showIndividualStats,
           teamNames: setup.teamNames,
           teamOrder: setup.teamOrder,
         }),
@@ -316,67 +320,76 @@ export default function FinalResultsScreen() {
           </View>
         </View>
 
-        <View style={styles.statsCard}>
-          <Text style={styles.sectionTitle}>Aciertos por jugador y ronda</Text>
-          {stats.enabledRounds.map((roundId) => {
-            const roundName =
-              ROUND_META.find((round) => round.id === roundId)?.name ||
-              `Ronda ${roundId}`;
-            const roundData = stats.roundPlayerScores[roundId] || {};
-            const roundTotals = teamIds.map((teamId) => {
-              const total = setup.players
-                .filter((player) => player.team === teamId)
-                .reduce((sum, player) => sum + (roundData[player.id] || 0), 0);
-              return `${getTeamName(teamId)}: ${total}`;
-            });
+        {setup.showIndividualStats && (
+          <View style={styles.statsCard}>
+            <Text style={styles.sectionTitle}>
+              Aciertos por jugador y ronda
+            </Text>
+            {stats.enabledRounds.map((roundId) => {
+              const roundName =
+                ROUND_META.find((round) => round.id === roundId)?.name ||
+                `Ronda ${roundId}`;
+              const roundData = stats.roundPlayerScores[roundId] || {};
+              const roundTotals = teamIds.map((teamId) => {
+                const total = setup.players
+                  .filter((player) => player.team === teamId)
+                  .reduce(
+                    (sum, player) => sum + (roundData[player.id] || 0),
+                    0,
+                  );
+                return `${getTeamName(teamId)}: ${total}`;
+              });
 
-            return (
-              <View key={`round-${roundId}`} style={styles.roundCard}>
-                <Text style={styles.roundTitle}>
-                  Ronda {roundId}: {roundName}
-                </Text>
-                <Text style={styles.roundTeamTotals}>
-                  {roundTotals.join(" · ")}
-                </Text>
+              return (
+                <View key={`round-${roundId}`} style={styles.roundCard}>
+                  <Text style={styles.roundTitle}>
+                    Ronda {roundId}: {roundName}
+                  </Text>
+                  <Text style={styles.roundTeamTotals}>
+                    {roundTotals.join(" · ")}
+                  </Text>
 
-                {setup.players.map((player) => (
-                  <View
-                    key={`${roundId}-${player.id}`}
-                    style={styles.playerRow}
-                  >
-                    <Text style={styles.playerLabel}>
-                      {player.name} ({getTeamName(player.team)})
-                    </Text>
-                    <Text style={styles.playerValue}>
-                      {roundData[player.id] || 0}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            );
-          })}
-        </View>
+                  {setup.players.map((player) => (
+                    <View
+                      key={`${roundId}-${player.id}`}
+                      style={styles.playerRow}
+                    >
+                      <Text style={styles.playerLabel}>
+                        {player.name} ({getTeamName(player.team)})
+                      </Text>
+                      <Text style={styles.playerValue}>
+                        {roundData[player.id] || 0}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-        <View style={styles.statsCard}>
-          <Text style={styles.sectionTitle}>Total individual</Text>
-          {setup.players
-            .slice()
-            .sort(
-              (a, b) =>
-                (stats.playerScores[b.id] || 0) -
-                (stats.playerScores[a.id] || 0),
-            )
-            .map((player) => (
-              <View key={`total-${player.id}`} style={styles.playerRow}>
-                <Text style={styles.playerLabel}>
-                  {player.name} ({getTeamName(player.team)})
-                </Text>
-                <Text style={styles.playerValue}>
-                  {stats.playerScores[player.id] || 0}
-                </Text>
-              </View>
-            ))}
-        </View>
+        {setup.showIndividualStats && (
+          <View style={styles.statsCard}>
+            <Text style={styles.sectionTitle}>Total individual</Text>
+            {setup.players
+              .slice()
+              .sort(
+                (a, b) =>
+                  (stats.playerScores[b.id] || 0) -
+                  (stats.playerScores[a.id] || 0),
+              )
+              .map((player) => (
+                <View key={`total-${player.id}`} style={styles.playerRow}>
+                  <Text style={styles.playerLabel}>
+                    {player.name} ({getTeamName(player.team)})
+                  </Text>
+                  <Text style={styles.playerValue}>
+                    {stats.playerScores[player.id] || 0}
+                  </Text>
+                </View>
+              ))}
+          </View>
+        )}
 
         <Button
           title="Nueva partida"
