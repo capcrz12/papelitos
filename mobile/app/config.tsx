@@ -46,9 +46,9 @@ const getDefaultTeamName = (teamId: number) =>
   TEAM_COLOR_NAMES[teamId] || "Equipo";
 
 const roundNames = [
-  "Ronda 1: Descripcion",
+  "Ronda 1: Descripción",
   "Ronda 2: Una palabra",
-  "Ronda 3: Mimica",
+  "Ronda 3: Mímica",
   "Ronda 4: Sonidos",
 ];
 
@@ -161,7 +161,7 @@ export default function ConfigScreen() {
 
   const saveConfig = () => {
     if (!rounds.some(Boolean)) {
-      Alert.alert("Configuracion incompleta", "Activa al menos una ronda.");
+      Alert.alert("Configuración incompleta", "Activa al menos una ronda.");
       return;
     }
 

@@ -31,9 +31,9 @@ interface FinalStats {
 }
 
 const ROUND_META = [
-  { id: 1, name: "Descripcion" },
+  { id: 1, name: "Descripción" },
   { id: 2, name: "Una palabra" },
-  { id: 3, name: "Mimica" },
+  { id: 3, name: "Mímica" },
   { id: 4, name: "Sonidos" },
 ];
 

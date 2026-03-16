@@ -89,7 +89,7 @@ export default function HomeScreen() {
 
             <Text style={styles.title}>QueRule</Text>
             <Text style={styles.subtitle}>
-              Rondas rapidas, equipos cara a cara y palabras que convierten el
+              Rondas rápidas, equipos cara a cara y palabras que convierten el
               salón en caos organizado.
             </Text>
 
@@ -111,7 +111,7 @@ export default function HomeScreen() {
                 <Text style={styles.previewLabel}>4 rondas</Text>
                 <Text style={styles.previewWord}>DESCRIPCIONES</Text>
                 <Text style={styles.previewWord}>PALABRA</Text>
-                <Text style={styles.previewWord}>MIMICA</Text>
+                <Text style={styles.previewWord}>MÍMICA</Text>
                 <Text style={styles.previewWord}>SONIDOS</Text>
               </LinearGradient>
 
@@ -145,7 +145,7 @@ export default function HomeScreen() {
             </View>
 
             <Text style={styles.helperText}>
-              Configura equipos, reparte el telefono y empieza en menos de un
+              Configura equipos, reparte el teléfono y empieza en menos de un
               minuto.
             </Text>
           </Animated.View>
@@ -166,7 +166,7 @@ export default function HomeScreen() {
               },
             ]}
           >
-            <Text style={styles.sectionTitle}>Como fluye</Text>
+            <Text style={styles.sectionTitle}>Cómo fluye</Text>
             <View
               style={[
                 styles.featureList,
@@ -194,7 +194,7 @@ export default function HomeScreen() {
                 <Text style={styles.featureStep}>02</Text>
                 <Text style={styles.featureTitle}>Configura la partida</Text>
                 <Text style={styles.featureText}>
-                  Cambia el juego, los tiempos, y el numero de palabras.
+                  Cambia el juego, los tiempos, y el número de palabras.
                 </Text>
               </View>
               <View
@@ -204,10 +204,10 @@ export default function HomeScreen() {
                 ]}
               >
                 <Text style={styles.featureStep}>03</Text>
-                <Text style={styles.featureTitle}>Entrega el movil</Text>
+                <Text style={styles.featureTitle}>Entrega el móvil</Text>
                 <Text style={styles.featureText}>
-                  Ve pasando el movil a los jugadores para que escriban palabras
-                  de cualquier categoria.
+                  Ve pasando el móvil a los jugadores para que escriban palabras
+                  de cualquier categoría.
                 </Text>
               </View>
               <View
@@ -221,7 +221,7 @@ export default function HomeScreen() {
                 <Text style={styles.featureText}>
                   Un jugador describe y el resto del equipo resuelve tantas
                   palabras como puedan en su turno. Para pasar de ronda se
-                  tienen que acabar todas las palabras. El equipo con mas
+                  tienen que acabar todas las palabras. El equipo con más
                   palabras acertadas gana la ronda.
                 </Text>
               </View>
@@ -258,7 +258,7 @@ export default function HomeScreen() {
                 ]}
               >
                 <Text style={styles.roundStep}>Ronda 1</Text>
-                <Text style={styles.roundTitle}>Descripcion</Text>
+                <Text style={styles.roundTitle}>Descripción</Text>
                 <Text style={styles.roundText}>
                   Describe la palabra sin mencionar la propia palabra ni partes
                   de ella.
@@ -273,7 +273,7 @@ export default function HomeScreen() {
                 <Text style={styles.roundStep}>Ronda 2</Text>
                 <Text style={styles.roundTitle}>Una palabra</Text>
                 <Text style={styles.roundText}>
-                  Solo puedes decir una unica palabra para describirla, sin
+                  Solo puedes decir una única palabra para describirla, sin
                   mencionar la propia palabra.
                 </Text>
               </View>
@@ -284,9 +284,9 @@ export default function HomeScreen() {
                 ]}
               >
                 <Text style={styles.roundStep}>Ronda 3</Text>
-                <Text style={styles.roundTitle}>Mimica</Text>
+                <Text style={styles.roundTitle}>Mímica</Text>
                 <Text style={styles.roundText}>
-                  Todo vale menos hablar: esta prohibido hacer cualquier tipo de
+                  Todo vale menos hablar: está prohibido hacer cualquier tipo de
                   ruido.
                 </Text>
               </View>
@@ -300,7 +300,7 @@ export default function HomeScreen() {
                 <Text style={styles.roundTitle}>Sonidos</Text>
                 <Text style={styles.roundText}>
                   Haz sonidos de espaldas o con los ojos cerrados. No vale
-                  ningun gesto, apañatelas como puedas.
+                  ningún gesto, apáñatelas como puedas.
                 </Text>
               </View>
             </View>
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   },
   previewWord: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "900",
     letterSpacing: 2,
   },
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   },
   previewMiniValue: {
     color: "#0f172a",
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: "900",
   },
   ctaButton: {
