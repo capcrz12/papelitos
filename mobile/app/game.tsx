@@ -57,8 +57,19 @@ const TEAM_COLOR_NAMES: Record<number, string> = {
   5: "Naranja",
 };
 
+const TEAM_TEXT_COLORS: Record<number, string> = {
+  1: "#1d4ed8",
+  2: "#dc2626",
+  3: "#15803d",
+  4: "#7c3aed",
+  5: "#ea580c",
+};
+
 const getDefaultTeamName = (teamId: number) =>
   TEAM_COLOR_NAMES[teamId] || "Equipo";
+
+const getTeamTextColor = (teamId: number) =>
+  TEAM_TEXT_COLORS[teamId] || "#111827";
 
 const fallbackSetup: GameSetup = {
   timePerTurn: 30,
@@ -872,7 +883,18 @@ export default function GameScreen() {
             style={styles.turnCard}
           >
             <Text style={styles.turnLabel}>Siguiente turno</Text>
-            <Text style={styles.playerName}>{currentPlayer?.name || "-"}</Text>
+            <Text
+              style={[
+                styles.playerName,
+                {
+                  color: currentPlayer
+                    ? getTeamTextColor(currentPlayer.team)
+                    : "#111827",
+                },
+              ]}
+            >
+              {currentPlayer?.name || "-"}
+            </Text>
             <Text style={styles.teamLabel}>
               {currentPlayer ? getTeamName(currentPlayer.team) : "-"}
             </Text>

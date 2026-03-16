@@ -39,8 +39,19 @@ const TEAM_COLOR_NAMES: Record<number, string> = {
   5: "Naranja",
 };
 
+const TEAM_TEXT_COLORS: Record<number, string> = {
+  1: "#1d4ed8",
+  2: "#dc2626",
+  3: "#15803d",
+  4: "#7c3aed",
+  5: "#ea580c",
+};
+
 const getDefaultTeamName = (teamId: number) =>
   TEAM_COLOR_NAMES[teamId] || "Equipo";
+
+const getTeamTextColor = (teamId: number) =>
+  TEAM_TEXT_COLORS[teamId] || "#111827";
 
 const defaultSetup: GameSetup = {
   timePerTurn: 30,
@@ -215,7 +226,14 @@ export default function WordSubmissionScreen() {
             style={styles.handoffCard}
           >
             <Text style={styles.handoffTitle}>Pasa el dispositivo a:</Text>
-            <Text style={styles.playerName}>{currentPlayer.name}</Text>
+            <Text
+              style={[
+                styles.playerName,
+                { color: getTeamTextColor(currentPlayer.team) },
+              ]}
+            >
+              {currentPlayer.name}
+            </Text>
             <Text style={styles.playerTeam}>
               {setup.teamNames[String(currentPlayer.team)] ||
                 getDefaultTeamName(currentPlayer.team)}
