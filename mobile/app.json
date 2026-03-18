@@ -27,7 +27,20 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
-    "plugins": ["expo-router", "expo-audio", "expo-video", "expo-asset"],
+    "plugins": [
+      "expo-router",
+      "expo-audio",
+      "expo-video",
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true
+          }
+        }
+      ]
+    ],
     "scheme": "querule",
     "extra": {
       "router": {},

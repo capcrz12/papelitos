@@ -11,6 +11,9 @@
       }
     },
     "production": {
+      "buildArtifactPaths": [
+        "android/app/build/outputs/mapping/release/mapping.txt"
+      ],
       "android": {
         "buildType": "app-bundle"
       },
