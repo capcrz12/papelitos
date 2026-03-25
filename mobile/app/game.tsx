@@ -46,8 +46,8 @@ const ROUND_META = [
 const ROUND_INSTRUCTIONS: Record<number, string> = {
   1: "Describe la palabra sin decir ninguna parte de ella.",
   2: "Solo puedes decir una palabra como pista.",
-  3: "Sin hablar: solo mimos y gestos.",
-  4: "Sin hablar: usa solo sonidos.",
+  3: "Sin hablar: solo mímica y gestos.",
+  4: "Sin gestos: usa solo sonidos.",
 };
 
 const TEAM_COLOR_NAMES: Record<number, string> = {
