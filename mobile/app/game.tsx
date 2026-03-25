@@ -591,6 +591,9 @@ export default function GameScreen() {
       return;
     }
 
+    // Mezclar la lista de palabras restantes tras cada turno
+    setQueue(shuffle(queue));
+
     advancePlayer();
   };
 
