@@ -288,6 +288,19 @@ export default function GameScreen() {
     Partial<Record<keyof typeof SOUND_ASSETS, AudioPlayer>>
   >({});
 
+  // Detiene todos los sonidos activos
+  const stopAllSounds = () => {
+    const sounds = Object.values(soundEffectsRef.current).filter(
+      Boolean,
+    ) as AudioPlayer[];
+    sounds.forEach((sound) => {
+      try {
+        if (typeof sound.pause === "function") sound.pause();
+        if (typeof sound.seekTo === "function") sound.seekTo(0);
+      } catch {}
+    });
+  };
+
   const currentTeamPlayers = playersByTeam[currentTurnTeam] || [];
   const currentTeamIndex = teamPlayerTurnIndices[currentTurnTeam];
   const currentPlayer =
@@ -510,6 +523,9 @@ export default function GameScreen() {
     let message = `Fin de ronda ${currentRoundNumber}. `;
     let nextRoundWins = { ...roundWins };
 
+    // Detener todos los sonidos activos al finalizar la ronda
+    stopAllSounds();
+
     const contenderTeams =
       playableTeamIds.length > 0 ? playableTeamIds : teamIds;
     const maxScore = Math.max(
@@ -564,6 +580,9 @@ export default function GameScreen() {
     if (!turnActive && !gameFinished) {
       return;
     }
+
+    // Detener todos los sonidos activos al finalizar el turno
+    stopAllSounds();
 
     if (reason === "timeout") {
       void playSoundEffect("ends");
